@@ -10,41 +10,91 @@
   <main class="page-shell">
     <p><a href="../../index.html">Back to landing page</a></p>
     <header class="hero">
-      <p class="eyebrow">CEPE FYNSP 2028 Program Review</p>
+      <p class="eyebrow">CEPE FYNSP 2028 Program Review · Dashboard 1</p>
       <h1>Pit Production Accuracy and Thoroughness Overview</h1>
-      <p>Portfolio-level review of programmed dollars, owners, site distribution, above-baseline drivers, data quality, and reconciliation.</p>
+      <p>Review what is programmed, who owns it, where it is split, what drives above-baseline growth, and whether the available FORMEX evidence is complete and reconcilable.</p>
+      <p class="generation-status" id="dashboard-generation">Generated data will load when this page is served with the project root as the static web root.</p>
     </header>
-    <section class="question-card" id="q1">
-  <h2>Q1. How much funding is programmed for Pit Production by fiscal year and funding level?</h2>
-  <div class="chart-placeholder" data-chart-id="01_overview_q1">Chart loads from generated JSON payload.</div>
-  <div class="rag-placeholder">AskSage RAG summary panel.</div>
-</section>
-<section class="question-card" id="q2">
-  <h2>Q2. Which organizations own the largest Pit Production funding shares?</h2>
-  <div class="chart-placeholder" data-chart-id="01_overview_q2">Chart loads from generated JSON payload.</div>
-  <div class="rag-placeholder">AskSage RAG summary panel.</div>
-</section>
-<section class="question-card" id="q3">
-  <h2>Q3. Which sites receive Pit Production funding, and how concentrated is the portfolio?</h2>
-  <div class="chart-placeholder" data-chart-id="01_overview_q3">Chart loads from generated JSON payload.</div>
-  <div class="rag-placeholder">AskSage RAG summary panel.</div>
-</section>
-<section class="question-card" id="q4">
-  <h2>Q4. Which program requests drive above-baseline Pit Production growth?</h2>
-  <div class="chart-placeholder" data-chart-id="01_overview_q4">Chart loads from generated JSON payload.</div>
-  <div class="rag-placeholder">AskSage RAG summary panel.</div>
-</section>
-<section class="question-card" id="q5">
-  <h2>Q5. Are there rows that appear incomplete, contradictory, or hard to trace?</h2>
-  <div class="chart-placeholder" data-chart-id="01_overview_q5">Chart loads from generated JSON payload.</div>
-  <div class="rag-placeholder">AskSage RAG summary panel.</div>
-</section>
-<section class="question-card" id="q6">
-  <h2>Q6. Do Crosscuts and Site Splits reconcile for Pit Production?</h2>
-  <div class="chart-placeholder" data-chart-id="01_overview_q6">Chart loads from generated JSON payload.</div>
-  <div class="rag-placeholder">AskSage RAG summary panel.</div>
-</section>
+
+    <section class="question-card" id="q1" data-question-id="q1">
+      <h2>Q1. How much funding is programmed for Pit Production by fiscal year and funding level?</h2>
+      <div class="metric-summary" aria-live="polite"></div>
+      <div class="chart-placeholder" data-chart-id="dashboard_01_pit_production_q1">Generated funding-by-year payload will render here.</div>
+      <div class="ai-summary" aria-live="polite">
+        <h3 class="panel-heading">AI Summary</h3>
+        <p>Generated summary will load from the chart payload.</p>
+        <button class="ask-button" type="button" disabled>Ask about this visualization</button>
+        <p class="panel-note">Live AskSage Q&amp;A requires a configured backend endpoint and approved credentials.</p>
+      </div>
+      <div class="traceability"><details><summary>Traceability and source details</summary><p>Generated source, filter, metric, lineage, and limitation details will load here.</p></details></div>
+    </section>
+
+    <section class="question-card" id="q2" data-question-id="q2">
+      <h2>Q2. Which organizations own the largest Pit Production funding shares?</h2>
+      <div class="metric-summary" aria-live="polite"></div>
+      <div class="chart-placeholder" data-chart-id="dashboard_01_pit_production_q2">Generated organization-ranking payload will render here.</div>
+      <div class="ai-summary" aria-live="polite">
+        <h3 class="panel-heading">AI Summary</h3>
+        <p>Generated summary will load from the chart payload.</p>
+        <button class="ask-button" type="button" disabled>Ask about this visualization</button>
+        <p class="panel-note">Live AskSage Q&amp;A requires a configured backend endpoint and approved credentials.</p>
+      </div>
+      <div class="traceability"><details><summary>Traceability and source details</summary><p>Generated source, filter, metric, lineage, and limitation details will load here.</p></details></div>
+    </section>
+
+    <section class="question-card" id="q3" data-question-id="q3">
+      <h2>Q3. Which sites receive Pit Production funding, and how concentrated is the portfolio?</h2>
+      <div class="metric-summary" aria-live="polite"></div>
+      <div class="chart-placeholder" data-chart-id="dashboard_01_pit_production_q3">Generated site-distribution payload will render here.</div>
+      <div class="ai-summary" aria-live="polite">
+        <h3 class="panel-heading">AI Summary</h3>
+        <p>Generated summary will load from the chart payload.</p>
+        <button class="ask-button" type="button" disabled>Ask about this visualization</button>
+        <p class="panel-note">Live AskSage Q&amp;A requires a configured backend endpoint and approved credentials.</p>
+      </div>
+      <div class="traceability"><details><summary>Traceability and source details</summary><p>Generated source, filter, metric, lineage, and limitation details will load here.</p></details></div>
+    </section>
+
+    <section class="question-card" id="q4" data-question-id="q4">
+      <h2>Q4. Which program requests drive above-baseline Pit Production growth?</h2>
+      <div class="metric-summary" aria-live="polite"></div>
+      <div class="chart-placeholder" data-chart-id="dashboard_01_pit_production_q4">Generated above-baseline request payload will render here.</div>
+      <div class="ai-summary" aria-live="polite">
+        <h3 class="panel-heading">AI Summary</h3>
+        <p>Generated summary will load from the chart payload.</p>
+        <button class="ask-button" type="button" disabled>Ask about this visualization</button>
+        <p class="panel-note">Live AskSage Q&amp;A requires a configured backend endpoint and approved credentials.</p>
+      </div>
+      <div class="traceability"><details><summary>Traceability and source details</summary><p>Generated source, filter, metric, lineage, and limitation details will load here.</p></details></div>
+    </section>
+
+    <section class="question-card" id="q5" data-question-id="q5">
+      <h2>Q5. Are there rows that appear incomplete, contradictory, or hard to trace?</h2>
+      <div class="metric-summary" aria-live="polite"></div>
+      <div class="chart-placeholder" data-chart-id="dashboard_01_pit_production_q5">Generated deterministic quality findings will render here.</div>
+      <div class="ai-summary" aria-live="polite">
+        <h3 class="panel-heading">AI Summary</h3>
+        <p>Generated summary will load from the chart payload.</p>
+        <button class="ask-button" type="button" disabled>Ask about this visualization</button>
+        <p class="panel-note">Live AskSage Q&amp;A requires a configured backend endpoint and approved credentials.</p>
+      </div>
+      <div class="traceability"><details><summary>Traceability and source details</summary><p>Generated source, filter, metric, lineage, and limitation details will load here.</p></details></div>
+    </section>
+
+    <section class="question-card" id="q6" data-question-id="q6">
+      <h2>Q6. Do Federal Crosscuts and Federal Site Splits reconcile for Pit Production?</h2>
+      <div class="metric-summary" aria-live="polite"></div>
+      <div class="chart-placeholder" data-chart-id="dashboard_01_pit_production_q6">Generated reconciliation payload will render here.</div>
+      <div class="ai-summary" aria-live="polite">
+        <h3 class="panel-heading">AI Summary</h3>
+        <p>Generated summary will load from the chart payload.</p>
+        <button class="ask-button" type="button" disabled>Ask about this visualization</button>
+        <p class="panel-note">Live AskSage Q&amp;A requires a configured backend endpoint and approved credentials.</p>
+      </div>
+      <div class="traceability"><details><summary>Traceability and source details</summary><p>Generated source, filter, metric, lineage, and limitation details will load here.</p></details></div>
+    </section>
   </main>
   <script src="../../assets/js/dashboard.js"></script>
+  <script src="../../assets/js/dashboard_01.js"></script>
 </body>
 </html>

@@ -13,5 +13,8 @@ function renderUnavailableState() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('[data-question-id]')) {
+    return;
+  }
   renderUnavailableState();
 });

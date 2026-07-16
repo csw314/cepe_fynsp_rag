@@ -18,6 +18,16 @@ Support an analyst assessing whether FYNSP programming data is accurate and thor
 4. Run ETL, validation, ontology export, dashboard payload export, and report generation.
 5. Serve the `web/` directory locally or deploy it to the approved internal static hosting environment.
 
+## Generate Dashboard 1
+
+Dashboard 1 reads the single UTF-16, tab-delimited FORMEX CSV under `data/raw/formex/` and writes aggregate-only static artifacts.
+
+```powershell
+.\.venv\Scripts\python.exe scripts\run_etl.py --dashboard 01
+```
+
+This creates JSON payloads under `data/curated/dashboard_payloads/dashboard_01_pit_production/`, RAG context under `data/curated/rag_chunks/dashboard_01_pit_production/`, and a graph export under `data/ontology/`. To view the dashboard locally, serve the repository root so both `web/` and `data/` are available, then open `/web/dashboards/01_overview/index.html`.
+
 ## Dashboards
 
 1. Pit Production Accuracy and Thoroughness Overview
