@@ -1,0 +1,28 @@
+project:
+  name: cepe-fynsp-dashboard
+  default_integration_area: Pit Production
+  default_scenario: FY28/32 - REV3 TARGETFRS (ALL NNSA)
+
+paths:
+  raw_formex: data/raw/formex/CSV Download (5).csv
+  raw_planex: data/raw/planex/staging_idw_planex_202607151621.csv
+  raw_costex: data/raw/costex/staging_idw_costex_202607151618.csv
+  interim_dir: data/interim
+  curated_dir: data/curated
+  ontology_dir: data/ontology
+  dashboard_payload_dir: data/curated/dashboard_payloads
+  reports_dir: data/reports
+
+formex:
+  encoding: utf-16
+  separator: "\t"
+  amount_column: formulated_measure
+  default_total_submission_type: Federal Crosscuts
+  site_submission_type: Federal Site Splits
+
+asksage:
+  instance_env: ASKSAGE_INSTANCE
+  email_env: ASKSAGE_EMAIL
+  api_key_env: ASKSAGE_API_KEY
+  access_token_env: ASKSAGE_ACCESS_TOKEN
+  model_env: ASKSAGE_MODEL

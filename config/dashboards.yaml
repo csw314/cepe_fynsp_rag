@@ -1,0 +1,115 @@
+dashboards:
+  - id: 01_overview
+    title: Pit Production Accuracy and Thoroughness Overview
+    primary_submission_type: Federal Crosscuts
+    questions:
+      - id: q1
+        text: How much funding is programmed for Pit Production by fiscal year and funding level?
+        visualization: stacked_bar
+      - id: q2
+        text: Which organizations own the largest Pit Production funding shares?
+        visualization: ranked_bar
+      - id: q3
+        text: Which sites receive Pit Production funding, and how concentrated is the portfolio?
+        visualization: treemap_or_ranked_bar
+      - id: q4
+        text: Which program requests drive above-baseline Pit Production growth?
+        visualization: pareto_bar
+      - id: q5
+        text: Are there rows that appear incomplete, contradictory, or hard to trace?
+        visualization: quality_scorecard_with_drilldown
+      - id: q6
+        text: Do Crosscuts and Site Splits reconcile for Pit Production?
+        visualization: reconciliation_waterfall
+
+  - id: 02_acquisition
+    title: Acquisition and Schedule Executability Monitor
+    primary_submission_type: Federal Crosscuts
+    questions:
+      - id: q1
+        text: How much Pit Production funding is tied to construction, MIEs, major modernization, or no acquisition tag?
+        visualization: stacked_bar
+      - id: q2
+        text: Which acquisition lines have the largest programmed values?
+        visualization: ranked_table
+      - id: q3
+        text: Do acquisition start and end dates support the funding profile?
+        visualization: gantt_timeline
+      - id: q4
+        text: Which acquisition rows have missing, classified, or suspicious dates?
+        visualization: exception_table
+      - id: q5
+        text: Where are LI TEC and LI OPC dollars concentrated by year and site?
+        visualization: heatmap
+      - id: q6
+        text: Which above-baseline acquisition requests are high-dollar and high-priority?
+        visualization: bubble_plot
+
+  - id: 03_site_capacity
+    title: Site Capacity and Integration Burden Dashboard
+    primary_submission_type: Federal Site Splits
+    questions:
+      - id: q1
+        text: Which sites receive the most Pit Production funding over FY2028-FY2032?
+        visualization: ranked_bar
+      - id: q2
+        text: How does Pit Production funding change by site and year?
+        visualization: heatmap
+      - id: q3
+        text: Which sites depend most on above-baseline funding?
+        visualization: percent_stacked_bar
+      - id: q4
+        text: Which organizations are funding the same site, creating integration dependencies?
+        visualization: sankey
+      - id: q5
+        text: Are there site-level funding cliffs or surges that should trigger executability review?
+        visualization: yoy_change_chart
+      - id: q6
+        text: Which site rows lack enough descriptive detail to support a thorough review?
+        visualization: drillthrough_table
+
+  - id: 04_priority_challenge
+    title: Priority, Tier, and Program Request Challenge Board
+    primary_submission_type: Federal Crosscuts
+    questions:
+      - id: q1
+        text: What are the largest Pit Production ROT and UFR requests?
+        visualization: pareto_bar
+      - id: q2
+        text: Which above-baseline requests are marked Tier 1, and why is that a review issue?
+        visualization: tier_heatmap
+      - id: q3
+        text: Do program priorities form a clear 1-N ranking, or are priorities reused across requests?
+        visualization: priority_uniqueness_matrix
+      - id: q4
+        text: Which requests appear to be offsets, restorations, or delays?
+        visualization: waterfall
+      - id: q5
+        text: Which requests have strong traceability from title to scope, site, WBS, and acquisition?
+        visualization: traceability_scorecard
+      - id: q6
+        text: Which rows lack Account Integrator decision traceability?
+        visualization: completeness_gauge_and_table
+
+  - id: 05_findings_report_generator
+    title: CEPE Findings, Evidence, and Report Generator
+    primary_submission_type: Federal Crosscuts
+    questions:
+      - id: q1
+        text: What are the top accuracy findings for the Pit Production FYNSP?
+        visualization: finding_cards
+      - id: q2
+        text: What are the top thoroughness findings?
+        visualization: coverage_matrix
+      - id: q3
+        text: What are the most material uncertainties, risks, and opportunities?
+        visualization: risk_opportunity_heatmap
+      - id: q4
+        text: Which exhibits best support the findings?
+        visualization: exhibit_gallery
+      - id: q5
+        text: Which source rows and guidance passages support each statement?
+        visualization: citation_lineage_graph
+      - id: q6
+        text: What should be included in the 5-7 page CEPE report?
+        visualization: generated_report_outline

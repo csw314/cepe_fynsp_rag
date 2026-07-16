@@ -1,0 +1,26 @@
+dataset: planex
+raw_file: data/raw/planex/staging_idw_planex_202607151621.csv
+format:
+  encoding: utf-8
+  separator: comma
+required_columns_raw:
+  - gl_period_year
+  - gl_period_number
+  - nnsa_appropriation
+  - stat_l3
+  - stat_l4
+  - stat_l5
+  - sub_office_number
+  - wbs
+  - wbs_level
+  - wbs_name
+  - site
+  - cost_plan_revision
+  - current_cost_plan
+  - contractor
+  - reporting_entity_value
+  - program_value
+  - bnr_code
+  - cost_plan
+canonical_amount_column: cost_plan
+use_case: FY2026 cost-plan execution context; not a direct FY2028-FY2032 FORMEX reconciliation source without crosswalk.

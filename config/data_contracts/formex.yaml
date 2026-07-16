@@ -1,0 +1,45 @@
+dataset: formex
+raw_file: data/raw/formex/CSV Download (5).csv
+format:
+  encoding: utf-16
+  separator: tab
+required_columns_raw:
+  - NNSA Appropriation
+  - STAT L3 (Programming)
+  - STAT L4 (Programming)
+  - STAT L5 (Programming)
+  - Construction or Operating
+  - Sub Office Number
+  - Site Grouping
+  - Site - PlanEX
+  - Site Name
+  - BNR Code
+  - Program Value
+  - Fiscal Year
+  - Scenario
+  - Submission Type
+  - Funding Levels
+  - Scope Description
+  - Program Request
+  - Program Int. Area
+  - Process Imp. Area
+  - Acquisition Type
+  - Acquisition ID
+  - Acquisition Name
+  - Acquisition Start Date
+  - Acquisition End Date
+  - Program Priority
+  - DOE Priority Tier
+  - Account Integrator Priority
+  - Account Integrator Decision
+  - WBS
+  - WBS Name
+  - WBS Level
+  - Formulated Measure
+canonical_amount_column: formulated_measure
+amount_parse_rule: remove_commas_and_cast_to_float
+analytic_layers:
+  default_portfolio: Federal Crosscuts
+  site_distribution: Federal Site Splits
+  stat_hierarchy: Federal STAT Table
+  gpra_constraints: GPRA Constraints

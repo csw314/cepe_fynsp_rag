@@ -1,0 +1,31 @@
+dataset: costex
+raw_file: data/raw/costex/staging_idw_costex_202607151618.csv
+format:
+  encoding: utf-8
+  separator: comma
+required_columns_raw:
+  - gl_period_year
+  - gl_period_number
+  - nnsa_appropriation
+  - stat_l3
+  - stat_l4
+  - stat_l5
+  - sub_office_number
+  - wbs
+  - wbs_level
+  - wbs_name
+  - site
+  - contractor
+  - reporting_entity_value
+  - program_value
+  - bnr_code
+  - cost_element
+  - labor_category
+  - dollars
+  - hours
+  - mtd_encumbrance
+  - ytd_encumbrance
+  - mtd_uncosted
+  - ytd_uncosted
+canonical_amount_column: dollars
+use_case: FY2026 cost/execution context; use for costed, uncosted, hours, encumbrance, and execution pattern review.
