@@ -18,15 +18,20 @@ Support an analyst assessing whether FYNSP programming data is accurate and thor
 4. Run ETL, validation, ontology export, dashboard payload export, and report generation.
 5. Serve the `web/` directory locally or deploy it to the approved internal static hosting environment.
 
-## Generate Dashboard 1
+## Generate dashboards
 
-Dashboard 1 reads the single UTF-16, tab-delimited FORMEX CSV under `data/raw/formex/` and writes aggregate-only static artifacts.
+Each dashboard reads the single UTF-16, tab-delimited FORMEX CSV under `data/raw/formex/` and writes aggregate-only static artifacts. Dashboard 5 synthesizes the generated Dashboards 1-4 artifacts and produces a report manifest; it does not make live AskSage calls or generate a DOCX.
 
 ```powershell
 .\.venv\Scripts\python.exe scripts\run_etl.py --dashboard 01
+.\.venv\Scripts\python.exe scripts\run_etl.py --dashboard 02
+.\.venv\Scripts\python.exe scripts\run_etl.py --dashboard 03
+.\.venv\Scripts\python.exe scripts\run_etl.py --dashboard 04
+.\.venv\Scripts\python.exe scripts\run_etl.py --dashboard 05
+.\.venv\Scripts\python.exe scripts\run_etl.py --dashboard all
 ```
 
-This creates JSON payloads under `data/curated/dashboard_payloads/dashboard_01_pit_production/`, RAG context under `data/curated/rag_chunks/dashboard_01_pit_production/`, and a graph export under `data/ontology/`. To view the dashboard locally, serve the repository root so both `web/` and `data/` are available, then open `/web/dashboards/01_overview/index.html`.
+This creates JSON payloads under `data/curated/dashboard_payloads/`, RAG context under `data/curated/rag_chunks/`, and graph exports under `data/ontology/`. Dashboard 5 also writes `data/reports/html/dashboard_05_report_manifest.json`. To view a dashboard locally, serve the repository root so both `web/` and `data/` are available, then open the desired page under `/web/dashboards/`.
 
 ## Dashboards
 
