@@ -31,4 +31,4 @@ __pycache__/
 .idea/
 
 # AskSage.ai credentials
-.**/credentials.json
+.credentials
