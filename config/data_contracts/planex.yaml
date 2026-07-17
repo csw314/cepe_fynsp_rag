@@ -1,5 +1,6 @@
 dataset: planex
-raw_file: data/raw/planex/staging_idw_planex_202607151621.csv
+contract_version: "2.0"
+raw_file: data/raw/planex/idw_planex_202607171050.csv
 format:
   encoding: utf-8
   separator: comma
@@ -11,6 +12,10 @@ required_columns_raw:
   - stat_l4
   - stat_l5
   - sub_office_number
+  - wbs_level_1
+  - wbs_level_1_name
+  - wbs_level_12
+  - wbs_level_12_name
   - wbs
   - wbs_level
   - wbs_name
@@ -23,4 +28,5 @@ required_columns_raw:
   - bnr_code
   - cost_plan
 canonical_amount_column: cost_plan
+allowed_fiscal_years: [2026]
 use_case: FY2026 cost-plan execution context; not a direct FY2028-FY2032 FORMEX reconciliation source without crosswalk.

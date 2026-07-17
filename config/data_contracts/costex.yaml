@@ -1,16 +1,22 @@
 dataset: costex
-raw_file: data/raw/costex/staging_idw_costex_202607151618.csv
+contract_version: "2.0"
+raw_file: data/raw/costex/idw_costex_202607171052.csv
 format:
   encoding: utf-8
   separator: comma
 required_columns_raw:
   - gl_period_year
   - gl_period_number
+  - calendar_period
   - nnsa_appropriation
   - stat_l3
   - stat_l4
   - stat_l5
   - sub_office_number
+  - wbs_level_1
+  - wbs_level_1_name
+  - wbs_level_12
+  - wbs_level_12_name
   - wbs
   - wbs_level
   - wbs_name
@@ -28,4 +34,11 @@ required_columns_raw:
   - mtd_uncosted
   - ytd_uncosted
 canonical_amount_column: dollars
-use_case: FY2026 cost/execution context; use for costed, uncosted, hours, encumbrance, and execution pattern review.
+additional_numeric_columns:
+  - hours
+  - mtd_encumbrance
+  - ytd_encumbrance
+  - mtd_uncosted
+  - ytd_uncosted
+allowed_fiscal_years: [2023, 2024, 2025, 2026]
+use_case: Historical FY2023-FY2026 cost/execution context; use FY2026 for PLANEX comparison and label other years as historical context. Do not directly reconcile to FY2028-FY2032 FORMEX without a crosswalk.

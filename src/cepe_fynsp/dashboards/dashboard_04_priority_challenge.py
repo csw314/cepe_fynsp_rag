@@ -58,7 +58,9 @@ def rank_rot_ufr_requests(crosscuts: pd.DataFrame) -> list[dict[str, Any]]:
         lambda value: display_value(value, "Unspecified program request")
     )
     grouped = (
-        working.groupby(["program_request", "funding_level_normalized"], dropna=False)[AMOUNT_COLUMN]
+        working.groupby(["program_request", "funding_level_normalized"], dropna=False)[
+            AMOUNT_COLUMN
+        ]
         .sum()
         .reset_index(name="amount")
         .sort_values("amount", ascending=False)
@@ -110,7 +112,8 @@ def aggregate_tier_by_funding_level(crosscuts: pd.DataFrame) -> list[dict[str, A
                 "amount_display": format_dollars(float(row.amount)),
                 "tier1_above_baseline_review_trigger": bool(is_trigger),
                 "review_note": "Review consistency with guidance; this is not automatically an error."
-                if is_trigger else "",
+                if is_trigger
+                else "",
             }
         )
     return records
@@ -136,7 +139,9 @@ def calculate_priority_uniqueness(
     """Identify reused priorities among material above-baseline program requests."""
     required = {"program_priority", "program_request"}
     if missing := sorted(required - set(crosscuts.columns)):
-        return [{"status": "not_evaluated", "reason": f"Missing FORMEX columns: {', '.join(missing)}."}]
+        return [
+            {"status": "not_evaluated", "reason": f"Missing FORMEX columns: {', '.join(missing)}."}
+        ]
     working = _above_baseline(crosscuts)
     working["program_priority_category"] = working["program_priority"].map(priority_category)
     working["program_request"] = working["program_request"].map(
@@ -164,20 +169,23 @@ def calculate_priority_uniqueness(
                 "amount": amount,
                 "amount_display": format_dollars(amount),
                 "priority_reused": duplicate,
-                "material_duplicate_review_trigger": duplicate and abs(amount) >= materiality_threshold,
+                "material_duplicate_review_trigger": duplicate
+                and abs(amount) >= materiality_threshold,
             }
         )
-    return sorted(records, key=lambda row: (not row["material_duplicate_review_trigger"], -abs(row["amount"])))
+    return sorted(
+        records, key=lambda row: (not row["material_duplicate_review_trigger"], -abs(row["amount"]))
+    )
 
 
 def classify_request_intent(
     program_request: object, scope_description: object, amount: float | int | None = None
 ) -> str:
     """Classify request intent using transparent deterministic keyword rules."""
-    text = " ".join(
-        str(value or "") for value in [program_request, scope_description]
-    ).casefold()
-    if re.search(r"\b(offset|decrement|reduce|reduction)\b", text) or (amount is not None and amount < 0):
+    text = " ".join(str(value or "") for value in [program_request, scope_description]).casefold()
+    if re.search(r"\b(offset|decrement|reduce|reduction)\b", text) or (
+        amount is not None and amount < 0
+    ):
         return "offset"
     if re.search(r"\b(restor|restore|restoration)\b", text):
         return "restoration"
@@ -197,16 +205,24 @@ def classify_offsets_restorations_delays(crosscuts: pd.DataFrame) -> list[dict[s
     if "program_request" not in crosscuts.columns:
         return [{"status": "not_evaluated", "reason": "Missing FORMEX program_request column."}]
     working = crosscuts.copy()
-    scope = working["scope_description"] if "scope_description" in working.columns else pd.Series("", index=working.index)
+    scope = (
+        working["scope_description"]
+        if "scope_description" in working.columns
+        else pd.Series("", index=working.index)
+    )
     working["classification"] = [
         classify_request_intent(request, description, amount)
-        for request, description, amount in zip(working["program_request"], scope, working[AMOUNT_COLUMN], strict=True)
+        for request, description, amount in zip(
+            working["program_request"], scope, working[AMOUNT_COLUMN], strict=True
+        )
     ]
     working["program_request"] = working["program_request"].map(
         lambda value: display_value(value, "Unspecified program request")
     )
     grouped = (
-        working.groupby(["program_request", "funding_level_normalized", "classification"], dropna=False)[AMOUNT_COLUMN]
+        working.groupby(
+            ["program_request", "funding_level_normalized", "classification"], dropna=False
+        )[AMOUNT_COLUMN]
         .sum()
         .reset_index(name="amount")
         .sort_values("amount", ascending=False)
@@ -245,7 +261,9 @@ def calculate_traceability_scores(crosscuts: pd.DataFrame) -> list[dict[str, Any
         "fiscal_year": _availability(working, "fiscal_year"),
         "funding_level": _availability(working, "funding_levels"),
     }
-    acquisition_related = _availability(working, "acquisition_id") | _availability(working, "acquisition_type")
+    acquisition_related = _availability(working, "acquisition_id") | _availability(
+        working, "acquisition_type"
+    )
     acquisition_complete = (
         _availability(working, "acquisition_id")
         & _availability(working, "acquisition_name")
@@ -254,8 +272,11 @@ def calculate_traceability_scores(crosscuts: pd.DataFrame) -> list[dict[str, Any
     components["acquisition"] = (~acquisition_related) | acquisition_complete
     component_frame = pd.DataFrame(components)
     working["program_request_label"] = (
-        working["program_request"].map(lambda value: display_value(value, "Unspecified program request"))
-        if "program_request" in working.columns else "Unspecified program request"
+        working["program_request"].map(
+            lambda value: display_value(value, "Unspecified program request")
+        )
+        if "program_request" in working.columns
+        else "Unspecified program request"
     )
     working["traceability_score"] = component_frame.mean(axis=1)
     for name in components:
@@ -264,9 +285,7 @@ def calculate_traceability_scores(crosscuts: pd.DataFrame) -> list[dict[str, Any
     component_columns = [f"component_{name}" for name in components]
     for program_request, group in working.groupby("program_request_label", dropna=False):
         amount = float(group[AMOUNT_COLUMN].sum())
-        component_coverage = {
-            name: float(group[f"component_{name}"].mean()) for name in components
-        }
+        component_coverage = {name: float(group[f"component_{name}"].mean()) for name in components}
         rows.append(
             {
                 "program_request": str(program_request),
@@ -276,7 +295,9 @@ def calculate_traceability_scores(crosscuts: pd.DataFrame) -> list[dict[str, Any
                 "traceability_score": float(group["traceability_score"].mean()),
                 "traceability_score_display": f"{float(group['traceability_score'].mean()):.0%}",
                 "component_coverage": component_coverage,
-                "complete_component_count": int(sum(value == 1.0 for value in component_coverage.values())),
+                "complete_component_count": int(
+                    sum(value == 1.0 for value in component_coverage.values())
+                ),
                 "component_count": len(component_columns),
             }
         )
@@ -291,7 +312,18 @@ def account_integrator_traceability(crosscuts: pd.DataFrame) -> list[dict[str, A
         ("account_integrator_priority", "Blank or zero Account Integrator Priority", "FQ008", True),
     ]:
         if field not in crosscuts.columns:
-            results.append({"rule_id": rule_id, "finding_id": rule_id, "title": title, "status": "not_evaluated", "row_count": 0, "affected_dollars": None, "affected_dollars_display": "Not available", "details": f"Not evaluated because FORMEX column '{field}' is unavailable."})
+            results.append(
+                {
+                    "rule_id": rule_id,
+                    "finding_id": rule_id,
+                    "title": title,
+                    "status": "not_evaluated",
+                    "row_count": 0,
+                    "affected_dollars": None,
+                    "affected_dollars_display": "Not available",
+                    "details": f"Not evaluated because FORMEX column '{field}' is unavailable.",
+                }
+            )
             continue
         mask = blank_mask(crosscuts[field])
         if zero_is_missing:
@@ -300,10 +332,23 @@ def account_integrator_traceability(crosscuts: pd.DataFrame) -> list[dict[str, A
         amount = float(crosscuts.loc[mask, AMOUNT_COLUMN].sum())
         results.append(
             {
-                "rule_id": rule_id, "finding_id": rule_id, "title": title, "status": "evaluated", "severity": "limitation",
-                "row_count": int(mask.sum()), "affected_dollars": amount, "affected_dollars_display": format_dollars(amount),
-                "details": "The field is structurally unavailable for review when all rows are blank or zero." if bool(mask.all()) else "Rows require Account Integrator traceability review.",
-                "source_row_id_sample": crosscuts.loc[mask, "source_row_id"].astype(str).head(100).tolist() if "source_row_id" in crosscuts.columns else [],
+                "rule_id": rule_id,
+                "finding_id": rule_id,
+                "title": title,
+                "status": "evaluated",
+                "severity": "limitation",
+                "row_count": int(mask.sum()),
+                "affected_dollars": amount,
+                "affected_dollars_display": format_dollars(amount),
+                "details": "The field is structurally unavailable for review when all rows are blank or zero."
+                if bool(mask.all())
+                else "Rows require Account Integrator traceability review.",
+                "source_row_id_sample": crosscuts.loc[mask, "source_row_id"]
+                .astype(str)
+                .head(100)
+                .tolist()
+                if "source_row_id" in crosscuts.columns
+                else [],
             }
         )
     return results
@@ -336,45 +381,183 @@ def build_dashboard_04_payloads(project_root: Path | None = None) -> dict[str, A
     ]
     payloads = {
         "q1": make_payload(
-            dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, question_id="q1", question_text=QUESTION_TEXT["q1"], chart_type="pareto_ranked_bar", chart_title="Largest ROT and UFR program requests",
-            metric_definition="Sum of FORMEX Formulated Measure by Program Request and funding level for ROT and UFR Federal Crosscuts rows, with cumulative above-baseline share.", source_submission_type=CROSSCUTS_SUBMISSION_TYPE, row_filter=above_filter,
-            grouping_columns=["program_request", "funding_level"], value_column=AMOUNT_COLUMN, record_count=len(_above_baseline(crosscuts)), data=q1_data, summary=_summary(q1_data, "No ROT/UFR requests were available."), limitations=limitations, lineage=source_row_lineage(_above_baseline(crosscuts)),
-            metric_cards=[{"label": "Above-baseline requests", "value": len(q1_data), "display": str(len(q1_data))}], metadata=metadata,
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id="q1",
+            question_text=QUESTION_TEXT["q1"],
+            chart_type="pareto_ranked_bar",
+            chart_title="Largest ROT and UFR program requests",
+            metric_definition="Sum of FORMEX Formulated Measure by Program Request and funding level for ROT and UFR Federal Crosscuts rows, with cumulative above-baseline share.",
+            source_submission_type=CROSSCUTS_SUBMISSION_TYPE,
+            row_filter=above_filter,
+            grouping_columns=["program_request", "funding_level"],
+            value_column=AMOUNT_COLUMN,
+            record_count=len(_above_baseline(crosscuts)),
+            data=q1_data,
+            summary=_summary(q1_data, "No ROT/UFR requests were available."),
+            limitations=limitations,
+            lineage=source_row_lineage(_above_baseline(crosscuts)),
+            metric_cards=[
+                {
+                    "label": "Above-baseline requests",
+                    "value": len(q1_data),
+                    "display": str(len(q1_data)),
+                }
+            ],
+            metadata=metadata,
         ),
         "q2": make_payload(
-            dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, question_id="q2", question_text=QUESTION_TEXT["q2"], chart_type="tier_funding_matrix", chart_title="DOE Priority Tier by funding level",
-            metric_definition="Row count and Formulated Measure by DOE Priority Tier and funding level in Federal Crosscuts; Tier 1 ROT/UFR is marked as a consistency review trigger.", source_submission_type=CROSSCUTS_SUBMISSION_TYPE, row_filter=row_filter,
-            grouping_columns=["doe_priority_tier", "funding_level"], value_column=AMOUNT_COLUMN, record_count=len(crosscuts), data=q2_data, summary=f"{sum(row.get('tier1_above_baseline_review_trigger', False) for row in q2_data)} Tier 1 above-baseline cells are review triggers.", limitations=limitations, lineage=source_row_lineage(crosscuts),
-            metric_cards=[{"label": "Tier 1 above-baseline cells", "value": sum(row.get("tier1_above_baseline_review_trigger", False) for row in q2_data), "display": str(sum(row.get("tier1_above_baseline_review_trigger", False) for row in q2_data))}], metadata=metadata,
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id="q2",
+            question_text=QUESTION_TEXT["q2"],
+            chart_type="tier_funding_matrix",
+            chart_title="DOE Priority Tier by funding level",
+            metric_definition="Row count and Formulated Measure by DOE Priority Tier and funding level in Federal Crosscuts; Tier 1 ROT/UFR is marked as a consistency review trigger.",
+            source_submission_type=CROSSCUTS_SUBMISSION_TYPE,
+            row_filter=row_filter,
+            grouping_columns=["doe_priority_tier", "funding_level"],
+            value_column=AMOUNT_COLUMN,
+            record_count=len(crosscuts),
+            data=q2_data,
+            summary=f"{sum(row.get('tier1_above_baseline_review_trigger', False) for row in q2_data)} Tier 1 above-baseline cells are review triggers.",
+            limitations=limitations,
+            lineage=source_row_lineage(crosscuts),
+            metric_cards=[
+                {
+                    "label": "Tier 1 above-baseline cells",
+                    "value": sum(
+                        row.get("tier1_above_baseline_review_trigger", False) for row in q2_data
+                    ),
+                    "display": str(
+                        sum(
+                            row.get("tier1_above_baseline_review_trigger", False) for row in q2_data
+                        )
+                    ),
+                }
+            ],
+            metadata=metadata,
         ),
         "q3": make_payload(
-            dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, question_id="q3", question_text=QUESTION_TEXT["q3"], chart_type="priority_uniqueness_matrix", chart_title="Program-priority uniqueness among above-baseline requests",
-            metric_definition="Distinct Program Request count and dollars by Program Priority and funding level for ROT/UFR Federal Crosscuts rows; blank, zero, and non-numeric priorities remain separate.", source_submission_type=CROSSCUTS_SUBMISSION_TYPE, row_filter=above_filter,
-            grouping_columns=["program_priority", "funding_level"], value_column=AMOUNT_COLUMN, record_count=len(_above_baseline(crosscuts)), data=q3_data, summary=f"{sum(row.get('material_duplicate_review_trigger', False) for row in q3_data)} material reused-priority groups are review triggers.", limitations=limitations, lineage=source_row_lineage(_above_baseline(crosscuts)),
-            metric_cards=[{"label": "Reused-priority groups", "value": sum(row.get("priority_reused", False) for row in q3_data), "display": str(sum(row.get("priority_reused", False) for row in q3_data))}], metadata=metadata,
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id="q3",
+            question_text=QUESTION_TEXT["q3"],
+            chart_type="priority_uniqueness_matrix",
+            chart_title="Program-priority uniqueness among above-baseline requests",
+            metric_definition="Distinct Program Request count and dollars by Program Priority and funding level for ROT/UFR Federal Crosscuts rows; blank, zero, and non-numeric priorities remain separate.",
+            source_submission_type=CROSSCUTS_SUBMISSION_TYPE,
+            row_filter=above_filter,
+            grouping_columns=["program_priority", "funding_level"],
+            value_column=AMOUNT_COLUMN,
+            record_count=len(_above_baseline(crosscuts)),
+            data=q3_data,
+            summary=f"{sum(row.get('material_duplicate_review_trigger', False) for row in q3_data)} material reused-priority groups are review triggers.",
+            limitations=limitations,
+            lineage=source_row_lineage(_above_baseline(crosscuts)),
+            metric_cards=[
+                {
+                    "label": "Reused-priority groups",
+                    "value": sum(row.get("priority_reused", False) for row in q3_data),
+                    "display": str(sum(row.get("priority_reused", False) for row in q3_data)),
+                }
+            ],
+            metadata=metadata,
         ),
         "q4": make_payload(
-            dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, question_id="q4", question_text=QUESTION_TEXT["q4"], chart_type="classified_ranked_table", chart_title="Deterministically classified offsets, restorations, and delays",
-            metric_definition="Sum of FORMEX Formulated Measure by Program Request, funding level, and deterministic intent label using request/scope keywords and negative-dollar flags.", source_submission_type=CROSSCUTS_SUBMISSION_TYPE, row_filter=row_filter,
-            grouping_columns=["program_request", "funding_level", "classification"], value_column=AMOUNT_COLUMN, record_count=len(crosscuts), data=q4_data, summary=_summary(q4_data, "No program-request classifications were available."), limitations=limitations, lineage=source_row_lineage(crosscuts),
-            metric_cards=[{"label": "Negative-dollar groups", "value": sum(row.get("negative_dollar_review_trigger", False) for row in q4_data), "display": str(sum(row.get("negative_dollar_review_trigger", False) for row in q4_data))}], metadata=metadata,
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id="q4",
+            question_text=QUESTION_TEXT["q4"],
+            chart_type="classified_ranked_table",
+            chart_title="Deterministically classified offsets, restorations, and delays",
+            metric_definition="Sum of FORMEX Formulated Measure by Program Request, funding level, and deterministic intent label using request/scope keywords and negative-dollar flags.",
+            source_submission_type=CROSSCUTS_SUBMISSION_TYPE,
+            row_filter=row_filter,
+            grouping_columns=["program_request", "funding_level", "classification"],
+            value_column=AMOUNT_COLUMN,
+            record_count=len(crosscuts),
+            data=q4_data,
+            summary=_summary(q4_data, "No program-request classifications were available."),
+            limitations=limitations,
+            lineage=source_row_lineage(crosscuts),
+            metric_cards=[
+                {
+                    "label": "Negative-dollar groups",
+                    "value": sum(
+                        row.get("negative_dollar_review_trigger", False) for row in q4_data
+                    ),
+                    "display": str(
+                        sum(row.get("negative_dollar_review_trigger", False) for row in q4_data)
+                    ),
+                }
+            ],
+            metadata=metadata,
         ),
         "q5": make_payload(
-            dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, question_id="q5", question_text=QUESTION_TEXT["q5"], chart_type="traceability_scorecard", chart_title="Program-request traceability completeness",
-            metric_definition="Per-program-request component completeness score for title, scope, WBS, BNR, site where available, acquisition fields when acquisition-related, fiscal year, and funding level in Federal Crosscuts.", source_submission_type=CROSSCUTS_SUBMISSION_TYPE, row_filter=row_filter,
-            grouping_columns=["program_request"], value_column="traceability completeness score", record_count=len(crosscuts), data=q5_data,
-            summary=f"Average traceability score across displayed program requests is {sum(row['traceability_score'] for row in q5_data) / len(q5_data):.0%}." if q5_data else "No traceability rows were available.", limitations=limitations, lineage=source_row_lineage(crosscuts),
-            metric_cards=[{"label": "Program requests scored", "value": len(q5_data), "display": str(len(q5_data))}], metadata=metadata,
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id="q5",
+            question_text=QUESTION_TEXT["q5"],
+            chart_type="traceability_scorecard",
+            chart_title="Program-request traceability completeness",
+            metric_definition="Per-program-request component completeness score for title, scope, WBS, BNR, site where available, acquisition fields when acquisition-related, fiscal year, and funding level in Federal Crosscuts.",
+            source_submission_type=CROSSCUTS_SUBMISSION_TYPE,
+            row_filter=row_filter,
+            grouping_columns=["program_request"],
+            value_column="traceability completeness score",
+            record_count=len(crosscuts),
+            data=q5_data,
+            summary=f"Average traceability score across displayed program requests is {sum(row['traceability_score'] for row in q5_data) / len(q5_data):.0%}."
+            if q5_data
+            else "No traceability rows were available.",
+            limitations=limitations,
+            lineage=source_row_lineage(crosscuts),
+            metric_cards=[
+                {
+                    "label": "Program requests scored",
+                    "value": len(q5_data),
+                    "display": str(len(q5_data)),
+                }
+            ],
+            metadata=metadata,
         ),
         "q6": make_payload(
-            dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, question_id="q6", question_text=QUESTION_TEXT["q6"], chart_type="account_integrator_completeness_table", chart_title="Account Integrator decision traceability",
-            metric_definition="Missing/blank Account Integrator Decision and blank/zero Account Integrator Priority counts and affected dollars in Federal Crosscuts.", source_submission_type=CROSSCUTS_SUBMISSION_TYPE, row_filter=row_filter,
-            grouping_columns=["rule_id"], value_column=f"{AMOUNT_COLUMN} affected dollars", record_count=len(crosscuts), data=q6_data,
-            summary="Account Integrator fields are reported as a data limitation when they are structurally blank or zero in the extract.", limitations=limitations, lineage=source_row_lineage(crosscuts),
-            metric_cards=[{"label": "Traceability limitation rows", "value": sum(row.get("row_count", 0) for row in q6_data), "display": str(sum(row.get("row_count", 0) for row in q6_data))}], metadata=metadata,
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id="q6",
+            question_text=QUESTION_TEXT["q6"],
+            chart_type="account_integrator_completeness_table",
+            chart_title="Account Integrator decision traceability",
+            metric_definition="Missing/blank Account Integrator Decision and blank/zero Account Integrator Priority counts and affected dollars in Federal Crosscuts.",
+            source_submission_type=CROSSCUTS_SUBMISSION_TYPE,
+            row_filter=row_filter,
+            grouping_columns=["rule_id"],
+            value_column=f"{AMOUNT_COLUMN} affected dollars",
+            record_count=len(crosscuts),
+            data=q6_data,
+            summary="Account Integrator fields are reported as a data limitation when they are structurally blank or zero in the extract.",
+            limitations=limitations,
+            lineage=source_row_lineage(crosscuts),
+            metric_cards=[
+                {
+                    "label": "Traceability limitation rows",
+                    "value": sum(row.get("row_count", 0) for row in q6_data),
+                    "display": str(sum(row.get("row_count", 0) for row in q6_data)),
+                }
+            ],
+            metadata=metadata,
         ),
     }
-    return write_dashboard_artifacts(root=root, dashboard_id=DASHBOARD_ID, dashboard_title=DASHBOARD_TITLE, payloads=payloads, payload_files=PAYLOAD_FILES, metadata=metadata, limitations=limitations)
+    return write_dashboard_artifacts(
+        root=root,
+        dashboard_id=DASHBOARD_ID,
+        dashboard_title=DASHBOARD_TITLE,
+        payloads=payloads,
+        payload_files=PAYLOAD_FILES,
+        metadata=metadata,
+        limitations=limitations,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -15,11 +15,25 @@ from cepe_fynsp.dashboards.dashboard_04_priority_challenge import (
 def _crosscuts() -> pd.DataFrame:
     return pd.DataFrame(
         {
-            "funding_level_normalized": ["ROT", "UFR", "Baseline", "ROT"], "program_request": ["Request A", "Request B", "Base", "Request C"],
-            "program_priority": [1, 1, 0, 1], "doe_priority_tier": [1, 2, 0, 1], "formulated_measure": [100.0, 50.0, 10.0, 25.0],
-            "scope_description": ["Build construction", "Restore operations", "Baseline scope", "Delay modernization"], "wbs": ["W", "W", "W", ""],
-            "bnr_code": ["B", "B", "B", ""], "site_planex": ["LANL", "LANL", "LANL", ""], "fiscal_year": ["FY2028"] * 4,
-            "funding_levels": ["ROT", "UFR", "Baseline", "ROT"], "acquisition_id": ["A", "", "", "C"], "acquisition_name": ["Alpha", "", "", "Charlie"], "acquisition_type": ["LI TEC", "", "", "LI OPC"],
+            "funding_level_normalized": ["ROT", "UFR", "Baseline", "ROT"],
+            "program_request": ["Request A", "Request B", "Base", "Request C"],
+            "program_priority": [1, 1, 0, 1],
+            "doe_priority_tier": [1, 2, 0, 1],
+            "formulated_measure": [100.0, 50.0, 10.0, 25.0],
+            "scope_description": [
+                "Build construction",
+                "Restore operations",
+                "Baseline scope",
+                "Delay modernization",
+            ],
+            "wbs": ["W", "W", "W", ""],
+            "bnr_code": ["B", "B", "B", ""],
+            "site_planex": ["LANL", "LANL", "LANL", ""],
+            "fiscal_year": ["FY2028"] * 4,
+            "funding_levels": ["ROT", "UFR", "Baseline", "ROT"],
+            "acquisition_id": ["A", "", "", "C"],
+            "acquisition_name": ["Alpha", "", "", "Charlie"],
+            "acquisition_type": ["LI TEC", "", "", "LI OPC"],
         }
     )
 

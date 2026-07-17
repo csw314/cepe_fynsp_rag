@@ -29,7 +29,10 @@ def test_site_total_aggregation_and_share() -> None:
     data = aggregate_site_totals(_sites())
     assert data[0]["site"] == "LANL"
     assert data[0]["amount"] == 150.0
-    assert round(sum(row["share_of_total"] for row in data if row["share_of_total"] is not None), 8) == 1.0
+    assert (
+        round(sum(row["share_of_total"] for row in data if row["share_of_total"] is not None), 8)
+        == 1.0
+    )
 
 
 def test_above_baseline_dependency_calculation() -> None:
@@ -39,7 +42,14 @@ def test_above_baseline_dependency_calculation() -> None:
 
 
 def test_yoy_surge_handles_zero_prior_as_new_funding() -> None:
-    sites = pd.DataFrame({"site_planex": ["LANL", "LANL"], "fiscal_year_normalized": ["FY2028", "FY2029"], "fiscal_year_number": [2028, 2029], "formulated_measure": [0.0, 75.0]})
+    sites = pd.DataFrame(
+        {
+            "site_planex": ["LANL", "LANL"],
+            "fiscal_year_normalized": ["FY2028", "FY2029"],
+            "fiscal_year_number": [2028, 2029],
+            "formulated_measure": [0.0, 75.0],
+        }
+    )
     data = calculate_site_yoy_surges(sites)
     assert data[1]["change_status"] == "new_funding"
     assert data[1]["percent_change"] is None

@@ -228,6 +228,42 @@ def negative_amount_finding(
     )
 
 
+def malformed_amount_finding(
+    df: pd.DataFrame,
+    *,
+    status_col: str = "amount_parse_status",
+    source_submission_type: str = "Federal Crosscuts",
+    lineage_limit: int = 100,
+) -> QualityFinding:
+    """Report invalid canonical amounts that were quarantined before aggregation (FQ003)."""
+    if status_col not in df.columns:
+        return _not_evaluated_finding(
+            "FQ003",
+            "Malformed monetary values",
+            f"Not evaluated because parse-status column '{status_col}' is unavailable.",
+            source_submission_type,
+        )
+    mask = df[status_col].astype("string") == "invalid"
+    source_row_ids: tuple[str, ...] = ()
+    lineage_column = "source_record_id" if "source_record_id" in df.columns else "source_row_id"
+    if lineage_column in df.columns:
+        source_row_ids = tuple(
+            str(value) for value in df.loc[mask, lineage_column].dropna().head(lineage_limit)
+        )
+    return QualityFinding(
+        rule_id="FQ003",
+        severity="high",
+        title="Malformed monetary values",
+        row_count=int(mask.sum()),
+        affected_dollars=None,
+        details=(
+            "Invalid monetary values are quarantined from downstream aggregation and must be corrected at source."
+        ),
+        source_submission_type=source_submission_type,
+        source_row_ids=source_row_ids,
+    )
+
+
 def reconciliation_finding(
     crosscuts_total: float,
     site_splits_total: float,
@@ -270,6 +306,11 @@ def evaluate_dashboard_01_quality_rules(
         else None
     )
     findings = [
+        malformed_amount_finding(
+            crosscuts,
+            source_submission_type=source,
+            lineage_limit=lineage_limit,
+        ),
         missing_field_finding(
             crosscuts,
             column="program_request",
@@ -402,7 +443,11 @@ def evaluate_dashboard_01_quality_rules(
                 title="Account Integrator Priority usability",
                 row_count=int(unusable.sum()),
                 affected_dollars=(
-                    float(pd.to_numeric(crosscuts.loc[unusable, amount_col], errors="coerce").sum())
+                    (lambda total: None if pd.isna(total) else float(total))(
+                        pd.to_numeric(crosscuts.loc[unusable, amount_col], errors="coerce").sum(
+                            min_count=1
+                        )
+                    )
                     if amount_col in crosscuts.columns
                     else None
                 ),
@@ -414,7 +459,9 @@ def evaluate_dashboard_01_quality_rules(
                 source_submission_type=source,
                 source_row_ids=tuple(
                     str(value)
-                    for value in crosscuts.loc[unusable, "source_row_id"].dropna().head(lineage_limit)
+                    for value in crosscuts.loc[unusable, "source_row_id"]
+                    .dropna()
+                    .head(lineage_limit)
                 )
                 if "source_row_id" in crosscuts.columns
                 else (),
@@ -423,11 +470,12 @@ def evaluate_dashboard_01_quality_rules(
     return findings
 
 
-def flag_tier1_above_baseline(df: pd.DataFrame, amount_col: str = "formulated_measure") -> QualityFinding:
+def flag_tier1_above_baseline(
+    df: pd.DataFrame, amount_col: str = "formulated_measure"
+) -> QualityFinding:
     """Flag Tier 1 rows that are above baseline."""
-    mask = (
-        df["funding_levels"].astype("string").str.upper().isin(["ROT", "UFR"])
-        & (pd.to_numeric(df["doe_priority_tier"], errors="coerce") == 1)
+    mask = df["funding_levels"].astype("string").str.upper().isin(["ROT", "UFR"]) & (
+        pd.to_numeric(df["doe_priority_tier"], errors="coerce") == 1
     )
     affected = df.loc[mask, amount_col].sum() if amount_col in df else None
     return QualityFinding(

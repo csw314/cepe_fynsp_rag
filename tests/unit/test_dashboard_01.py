@@ -44,7 +44,13 @@ def _synthetic_formex() -> pd.DataFrame:
             "Scenario": ["Scenario A"] * 5,
             "Sub Office Number": ["NA-19", "NA-90", "NA-19", "NA-90", "NA-00"],
             "Site - PlanEX": ["LANL", "SRS-SRNS", "LANL", "SRS-SRNS", "Other"],
-            "Program Request": ["Baseline work", "Growth request", "Baseline work", "Growth request", "Other"],
+            "Program Request": [
+                "Baseline work",
+                "Growth request",
+                "Baseline work",
+                "Growth request",
+                "Other",
+            ],
             "Scope Description": ["Scope"] * 5,
             "WBS": ["1.1"] * 5,
             "BNR Code": ["BNR"] * 5,
@@ -56,6 +62,18 @@ def _synthetic_formex() -> pd.DataFrame:
             "Acquisition Name": [None] * 5,
             "Acquisition Start Date": [None] * 5,
             "Acquisition End Date": [None] * 5,
+            "NNSA Appropriation": ["Weapons Activities"] * 5,
+            "STAT L3 (Programming)": ["L3"] * 5,
+            "STAT L4 (Programming)": ["L4"] * 5,
+            "STAT L5 (Programming)": ["L5"] * 5,
+            "Construction or Operating": ["Operating"] * 5,
+            "Site Grouping": ["Federal"] * 5,
+            "Site Name": ["Site"] * 5,
+            "Program Value": ["Program"] * 5,
+            "Process Imp. Area": ["None"] * 5,
+            "Program Priority": [1, 2, 1, 2, 3],
+            "WBS Name": ["Work"] * 5,
+            "WBS Level": [1] * 5,
         }
     )
 
@@ -63,9 +81,7 @@ def _synthetic_formex() -> pd.DataFrame:
 def _prepared_layers() -> tuple[pd.DataFrame, pd.DataFrame]:
     """Return prepared synthetic Crosscuts and Site Splits frames."""
     prepared = prepare_formex_dataframe(_synthetic_formex())
-    crosscuts = filter_pit_production(
-        prepared, CROSSCUTS_SUBMISSION_TYPE, scenario="Scenario A"
-    )
+    crosscuts = filter_pit_production(prepared, CROSSCUTS_SUBMISSION_TYPE, scenario="Scenario A")
     site_splits = filter_pit_production(
         prepared, SITE_SPLITS_SUBMISSION_TYPE, scenario="Scenario A"
     )
@@ -100,6 +116,13 @@ def test_q1_aggregation_uses_fiscal_year_and_funding_level() -> None:
             "funding_level": "Baseline",
             "amount": 100.0,
             "amount_display": "$100",
+            "valid_amount_row_count": 1,
+            "blank_amount_row_count": 0,
+            "invalid_amount_row_count": 0,
+            "excluded_amount_row_count": 0,
+            "total_source_row_count": 1,
+            "completeness_percentage": 100.0,
+            "aggregate_status": "complete",
         },
         {
             "fiscal_year": "FY2029",
@@ -107,6 +130,13 @@ def test_q1_aggregation_uses_fiscal_year_and_funding_level() -> None:
             "funding_level": "ROT",
             "amount": 25.0,
             "amount_display": "$25",
+            "valid_amount_row_count": 1,
+            "blank_amount_row_count": 0,
+            "invalid_amount_row_count": 0,
+            "excluded_amount_row_count": 0,
+            "total_source_row_count": 1,
+            "completeness_percentage": 100.0,
+            "aggregate_status": "complete",
         },
     ]
 
@@ -152,13 +182,24 @@ asksage: {}
 
     manifest = build_dashboard_01_payloads(tmp_path)
 
-    payload_dir = tmp_path / "data" / "curated" / "dashboard_payloads" / "dashboard_01_pit_production"
-    q1_payload = json.loads((payload_dir / "q1_funding_by_year_level.json").read_text(encoding="utf-8"))
+    payload_dir = (
+        tmp_path / "data" / "curated" / "dashboard_payloads" / "dashboard_01_pit_production"
+    )
+    q1_payload = json.loads(
+        (payload_dir / "q1_funding_by_year_level.json").read_text(encoding="utf-8")
+    )
     assert manifest["dashboard_id"] == "dashboard_01_pit_production"
     assert (payload_dir / "manifest.json").exists()
     assert q1_payload["traceability"]["chart_id"] == "dashboard_01_pit_production_q1"
     assert q1_payload["traceability"]["source_submission_type"] == "Federal Crosscuts"
-    assert (tmp_path / "data" / "curated" / "rag_chunks" / "dashboard_01_pit_production" / "dashboard_01_context.jsonl").exists()
+    assert (
+        tmp_path
+        / "data"
+        / "curated"
+        / "rag_chunks"
+        / "dashboard_01_pit_production"
+        / "dashboard_01_context.jsonl"
+    ).exists()
     graph = json.loads(
         (tmp_path / "data" / "ontology" / "dashboard_01_pit_production_graph.json").read_text(
             encoding="utf-8"

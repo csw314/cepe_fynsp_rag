@@ -1,4 +1,4 @@
-# Recommended project structure
+# Implemented project structure
 
 ```text
 cepe-fynsp-dashboard/
@@ -66,3 +66,13 @@ cepe-fynsp-dashboard/
 - `web`: static HTML dashboard interface.
 - `src/cepe_fynsp`: reusable Python package.
 - `docs/agents`: agent guidance for Codex or other coding assistants.
+
+## Runtime flow
+
+1. `etl/contracts.py` validates raw headers and domains against versioned YAML contracts.
+2. `etl/pipeline.py` writes stable-lineage normalized Parquet. FORMEX uses its encoding-aware loader; large PLANEX/COSTEX exports use DuckDB streaming/columnar processing.
+3. Dashboard modules calculate question-specific aggregate evidence. `dashboard_support.py` validates schema-v2 payloads and atomically writes manifests, RAG packets, graph JSON, and JSON-LD.
+4. `web/assets/js/dashboard_renderer.js` renders only aggregate payloads with local dependency-free components. One failed question is isolated from the remaining panels.
+5. Dashboard 5 creates the read-only finding register/evidence manifest. `reporting/generator.py` validates all inputs and writes the deterministic DOCX/HTML/exhibit/citation set.
+
+All generated data, ontology, and report outputs remain ignored. CI uses `scripts/build_synthetic_ci.py` so validation does not depend on controlled raw files.

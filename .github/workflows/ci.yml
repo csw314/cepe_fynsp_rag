@@ -1,0 +1,42 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install project and development tools
+        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]" pip-audit
+      - name: Lint
+        run: ruff check .
+      - name: Format check
+        run: ruff format --check .
+      - name: Type check
+        run: mypy src
+      - name: Compile
+        run: python -m compileall -q src scripts
+      - name: Unit and integration tests
+        run: pytest -q
+      - name: Complete synthetic dashboard and report build
+        run: python scripts/build_synthetic_ci.py
+      - name: Offline assets, mandatory questions, and raw-data policy
+        run: python scripts/validate_static.py
+      - name: Secret scan
+        run: |
+          if git grep -n -E '(sk-[A-Za-z0-9_-]{20,}|AKIA[A-Z0-9]{16}|gh[pousr]_[A-Za-z0-9]{20,})'; then
+            echo "Potential committed secret detected"
+            exit 1
+          fi
+      - name: Dependency audit
+        run: pip-audit -r requirements.txt

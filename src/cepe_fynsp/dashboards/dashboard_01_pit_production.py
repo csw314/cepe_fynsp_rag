@@ -25,7 +25,13 @@ import pandas as pd
 from cepe_fynsp.asksage.client import AskSageClient
 from cepe_fynsp.config import load_settings
 from cepe_fynsp.etl.loaders import load_formex
-from cepe_fynsp.etl.normalize import add_source_row_id, normalize_columns, parse_dollar_amounts, require_columns
+from cepe_fynsp.etl.contracts import load_contract, validate_dataframe
+from cepe_fynsp.etl.financial import (
+    add_amount_metadata,
+    aggregate_financial,
+    financial_completeness,
+)
+from cepe_fynsp.etl.normalize import add_source_lineage, normalize_columns, require_columns
 from cepe_fynsp.quality.rules import (
     QualityFinding,
     evaluate_dashboard_01_quality_rules,
@@ -51,7 +57,7 @@ QUESTION_TEXT = {
     "q3": "Which sites receive Pit Production funding, and how concentrated is the portfolio?",
     "q4": "Which program requests drive above-baseline Pit Production growth?",
     "q5": "Are there rows that appear incomplete, contradictory, or hard to trace?",
-    "q6": "Do Federal Crosscuts and Federal Site Splits reconcile for Pit Production?",
+    "q6": "Do Crosscuts and Site Splits reconcile for Pit Production?",
 }
 
 
@@ -159,15 +165,17 @@ def prepare_formex_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     ]
     require_columns(prepared, required)
 
-    for column in prepared.columns:
+    if "source_record_id" not in prepared.columns:
+        prepared = add_source_lineage(prepared, "formex")
+    source_columns = [column for column in prepared.columns if not column.startswith("source_")]
+    for column in source_columns:
         if pd.api.types.is_object_dtype(prepared[column]) or pd.api.types.is_string_dtype(
             prepared[column]
         ):
             prepared[column] = prepared[column].map(normalize_text_value)
 
-    if "source_row_id" not in prepared.columns:
-        prepared = add_source_row_id(prepared, "formex")
-    prepared[AMOUNT_COLUMN] = parse_dollar_amounts(prepared[AMOUNT_COLUMN])
+    prepared = add_amount_metadata(prepared, AMOUNT_COLUMN)
+    prepared[AMOUNT_COLUMN] = prepared["amount_normalized"]
     prepared["submission_type"] = prepared["submission_type"].map(normalize_submission_type)
     prepared["program_int_area_normalized"] = prepared["program_int_area"].map(normalize_text_value)
     prepared["funding_level_normalized"] = prepared["funding_levels"].map(normalize_funding_level)
@@ -218,13 +226,14 @@ def filter_pit_production(
     area = normalize_text_value(integration_area)
     if area is None:
         raise ValueError("integration_area must contain a non-blank value.")
-    mask = (
-        (df["submission_type"] == submission_type)
-        & (df["program_int_area_normalized"].astype("string").str.casefold() == area.casefold())
+    mask = (df["submission_type"] == submission_type) & (
+        df["program_int_area_normalized"].astype("string").str.casefold() == area.casefold()
     )
     if scenario is not None:
         if "scenario" not in df.columns:
-            raise ValueError("FORMEX scenario filtering was requested but the 'scenario' column is absent.")
+            raise ValueError(
+                "FORMEX scenario filtering was requested but the 'scenario' column is absent."
+            )
         mask &= df["scenario"].astype("string").str.casefold() == scenario.casefold()
     return df.loc[mask].copy()
 
@@ -247,12 +256,9 @@ def format_dollars(value: float | int | None) -> str:
 
 def aggregate_q1_funding_by_year_level(crosscuts: pd.DataFrame) -> list[dict[str, Any]]:
     """Aggregate Federal Crosscuts funding by fiscal year and funding level."""
-    grouped = (
-        crosscuts.groupby(["fiscal_year_normalized", "fiscal_year_number", "funding_level_normalized"], dropna=False)[
-            AMOUNT_COLUMN
-        ]
-        .sum()
-        .reset_index(name="amount")
+    grouped = aggregate_financial(
+        crosscuts,
+        ["fiscal_year_normalized", "fiscal_year_number", "funding_level_normalized"],
     )
     grouped["level_order"] = grouped["funding_level_normalized"].map(FUNDING_LEVEL_ORDER).fillna(99)
     grouped = grouped.sort_values(
@@ -261,7 +267,7 @@ def aggregate_q1_funding_by_year_level(crosscuts: pd.DataFrame) -> list[dict[str
     )
     records: list[dict[str, Any]] = []
     for row in grouped.itertuples(index=False):
-        amount = float(row.amount)
+        amount = None if pd.isna(row.amount) else float(row.amount)
         records.append(
             {
                 "fiscal_year": row.fiscal_year_normalized,
@@ -271,6 +277,15 @@ def aggregate_q1_funding_by_year_level(crosscuts: pd.DataFrame) -> list[dict[str
                 "funding_level": row.funding_level_normalized,
                 "amount": amount,
                 "amount_display": format_dollars(amount),
+                "valid_amount_row_count": int(row.valid_amount_row_count),
+                "blank_amount_row_count": int(row.blank_amount_row_count),
+                "invalid_amount_row_count": int(row.invalid_amount_row_count),
+                "excluded_amount_row_count": int(row.excluded_amount_row_count),
+                "total_source_row_count": int(row.total_source_row_count),
+                "completeness_percentage": float(row.completeness_percentage)
+                if pd.notna(row.completeness_percentage)
+                else None,
+                "aggregate_status": str(row.aggregate_status),
             }
         )
     return records
@@ -283,19 +298,23 @@ def aggregate_q2_funding_by_organization(crosscuts: pd.DataFrame) -> list[dict[s
         return []
     working = crosscuts.copy()
     working[organization_column] = working[organization_column].fillna("Unspecified organization")
-    grouped = working.groupby(organization_column, dropna=False)[AMOUNT_COLUMN].sum().reset_index(name="amount")
+    grouped = aggregate_financial(working, [organization_column])
     grouped = grouped.sort_values("amount", ascending=False)
     total = float(grouped["amount"].sum())
     records = []
     for rank, row in enumerate(grouped.itertuples(index=False), start=1):
-        amount = float(row.amount)
+        amount = None if pd.isna(row.amount) else float(row.amount)
         records.append(
             {
                 "organization": str(getattr(row, organization_column)),
                 "amount": amount,
                 "amount_display": format_dollars(amount),
-                "share_of_total": amount / total if total else None,
+                "share_of_total": amount / total if amount is not None and total else None,
                 "rank": rank,
+                "aggregate_status": str(row.aggregate_status),
+                "completeness_percentage": float(row.completeness_percentage)
+                if pd.notna(row.completeness_percentage)
+                else None,
             }
         )
     return records
@@ -308,19 +327,23 @@ def aggregate_q3_site_distribution(site_splits: pd.DataFrame) -> list[dict[str, 
         return []
     working = site_splits.copy()
     working[site_column] = working[site_column].fillna("Unspecified site")
-    grouped = working.groupby(site_column, dropna=False)[AMOUNT_COLUMN].sum().reset_index(name="amount")
+    grouped = aggregate_financial(working, [site_column])
     grouped = grouped.sort_values("amount", ascending=False)
     total = float(grouped["amount"].sum())
     records = []
     for rank, row in enumerate(grouped.itertuples(index=False), start=1):
-        amount = float(row.amount)
+        amount = None if pd.isna(row.amount) else float(row.amount)
         records.append(
             {
                 "site": str(getattr(row, site_column)),
                 "amount": amount,
                 "amount_display": format_dollars(amount),
-                "share_of_total": amount / total if total else None,
+                "share_of_total": amount / total if amount is not None and total else None,
                 "rank": rank,
+                "aggregate_status": str(row.aggregate_status),
+                "completeness_percentage": float(row.completeness_percentage)
+                if pd.notna(row.completeness_percentage)
+                else None,
             }
         )
     return records
@@ -332,22 +355,27 @@ def aggregate_q4_above_baseline_requests(crosscuts: pd.DataFrame) -> list[dict[s
         return []
     working = crosscuts.loc[crosscuts["funding_level_normalized"].isin(["ROT", "UFR"])].copy()
     working["program_request"] = working["program_request"].fillna("Unspecified program request")
-    grouped = working.groupby("program_request", dropna=False)[AMOUNT_COLUMN].sum().reset_index(name="amount")
+    grouped = aggregate_financial(working, ["program_request"])
     grouped = grouped.sort_values("amount", ascending=False)
     total = float(grouped["amount"].sum())
     cumulative = 0.0
     records = []
     for rank, row in enumerate(grouped.itertuples(index=False), start=1):
-        amount = float(row.amount)
-        cumulative += amount
+        amount = None if pd.isna(row.amount) else float(row.amount)
+        if amount is not None:
+            cumulative += amount
         records.append(
             {
                 "program_request": str(row.program_request),
                 "amount": amount,
                 "amount_display": format_dollars(amount),
-                "share_of_above_baseline": amount / total if total else None,
+                "share_of_above_baseline": amount / total if amount is not None and total else None,
                 "cumulative_share": cumulative / total if total else None,
                 "rank": rank,
+                "aggregate_status": str(row.aggregate_status),
+                "completeness_percentage": float(row.completeness_percentage)
+                if pd.notna(row.completeness_percentage)
+                else None,
             }
         )
     return records
@@ -357,17 +385,35 @@ def calculate_q6_reconciliation(
     crosscuts: pd.DataFrame, site_splits: pd.DataFrame
 ) -> tuple[list[dict[str, Any]], dict[str, float | None]]:
     """Compare Pit Production totals by funding level across the two required layers."""
-    crosscuts_grouped = crosscuts.groupby("funding_level_normalized")[AMOUNT_COLUMN].sum()
-    sites_grouped = site_splits.groupby("funding_level_normalized")[AMOUNT_COLUMN].sum()
+    crosscuts_grouped = aggregate_financial(crosscuts, ["funding_level_normalized"]).set_index(
+        "funding_level_normalized"
+    )
+    sites_grouped = aggregate_financial(site_splits, ["funding_level_normalized"]).set_index(
+        "funding_level_normalized"
+    )
     levels = sorted(
         set(crosscuts_grouped.index).union(sites_grouped.index),
         key=lambda level: (FUNDING_LEVEL_ORDER.get(level, 99), level),
     )
     records = []
     for level in levels:
-        crosscuts_amount = float(crosscuts_grouped.get(level, 0.0))
-        site_splits_amount = float(sites_grouped.get(level, 0.0))
-        variance = site_splits_amount - crosscuts_amount
+        crosscuts_row = crosscuts_grouped.loc[level] if level in crosscuts_grouped.index else None
+        sites_row = sites_grouped.loc[level] if level in sites_grouped.index else None
+        crosscuts_amount = (
+            None
+            if crosscuts_row is None or pd.isna(crosscuts_row["amount"])
+            else float(crosscuts_row["amount"])
+        )
+        site_splits_amount = (
+            None
+            if sites_row is None or pd.isna(sites_row["amount"])
+            else float(sites_row["amount"])
+        )
+        variance = (
+            site_splits_amount - crosscuts_amount
+            if site_splits_amount is not None and crosscuts_amount is not None
+            else None
+        )
         records.append(
             {
                 "funding_level": level,
@@ -377,17 +423,31 @@ def calculate_q6_reconciliation(
                 "federal_site_splits_display": format_dollars(site_splits_amount),
                 "variance_amount": variance,
                 "variance_display": format_dollars(variance),
-                "variance_percent": variance / crosscuts_amount if crosscuts_amount else None,
+                "variance_percent": variance / crosscuts_amount
+                if variance is not None and crosscuts_amount
+                else None,
+                "aggregate_status": (
+                    "complete"
+                    if crosscuts_row is not None
+                    and sites_row is not None
+                    and crosscuts_row["aggregate_status"] == "complete"
+                    and sites_row["aggregate_status"] == "complete"
+                    else "partial"
+                ),
             }
         )
-    crosscuts_total = float(crosscuts[AMOUNT_COLUMN].sum())
-    site_splits_total = float(site_splits[AMOUNT_COLUMN].sum())
+    crosscuts_value = aggregate_financial(crosscuts).iloc[0]["amount"]
+    site_splits_value = aggregate_financial(site_splits).iloc[0]["amount"]
+    crosscuts_total = None if pd.isna(crosscuts_value) else float(crosscuts_value)
+    site_splits_total = None if pd.isna(site_splits_value) else float(site_splits_value)
     return records, {
         "federal_crosscuts_total": crosscuts_total,
         "federal_site_splits_total": site_splits_total,
-        "variance_amount": site_splits_total - crosscuts_total,
+        "variance_amount": site_splits_total - crosscuts_total
+        if site_splits_total is not None and crosscuts_total is not None
+        else None,
         "variance_percent": (site_splits_total - crosscuts_total) / crosscuts_total
-        if crosscuts_total
+        if site_splits_total is not None and crosscuts_total
         else None,
     }
 
@@ -430,7 +490,9 @@ def _summary_for_q1(data: list[dict[str, Any]]) -> str:
     total = sum(row["amount"] for row in data)
     level_totals: dict[str, float] = {}
     for row in data:
-        level_totals[row["funding_level"]] = level_totals.get(row["funding_level"], 0.0) + row["amount"]
+        level_totals[row["funding_level"]] = (
+            level_totals.get(row["funding_level"], 0.0) + row["amount"]
+        )
     parts = ", ".join(
         f"{level} {format_dollars(amount)}" for level, amount in sorted(level_totals.items())
     )
@@ -595,7 +657,10 @@ def build_dashboard_01_graph(payloads: Mapping[str, Mapping[str, Any]]) -> dict[
     add_node(source_node, "SourceFile", source_file)
 
     dimension_edges = {
-        "q1": [("funding_level", "FundingLevel", "funding_line_grouped_by_funding_level"), ("fiscal_year", "FiscalYear", "funding_line_grouped_by_fiscal_year")],
+        "q1": [
+            ("funding_level", "FundingLevel", "funding_line_grouped_by_funding_level"),
+            ("fiscal_year", "FiscalYear", "funding_line_grouped_by_fiscal_year"),
+        ],
         "q2": [("organization", "Organization", "funding_line_grouped_by_organization")],
         "q3": [("site", "Site", "funding_line_grouped_by_site")],
         "q4": [("program_request", "ProgramRequest", "funding_line_grouped_by_program_request")],
@@ -613,7 +678,9 @@ def build_dashboard_01_graph(payloads: Mapping[str, Mapping[str, Any]]) -> dict[
         add_edge(chart_node, metric_node, "chart_uses_metric")
         add_edge(metric_node, source_node, "metric_derived_from_source_file")
         add_edge(chart_node, integration_area_node, "chart_filtered_to_integration_area")
-        for submission_type in str(payload["traceability"]["source_submission_type"]).split(" and "):
+        for submission_type in str(payload["traceability"]["source_submission_type"]).split(
+            " and "
+        ):
             submission_node = _node_id("SubmissionType", submission_type)
             add_node(submission_node, "SubmissionType", submission_type)
             add_edge(metric_node, submission_node, "metric_uses_submission_type")
@@ -636,7 +703,9 @@ def build_dashboard_01_graph(payloads: Mapping[str, Mapping[str, Any]]) -> dict[
         "graph_id": f"{DASHBOARD_ID}_graph",
         "dashboard_id": DASHBOARD_ID,
         "nodes": sorted(nodes.values(), key=lambda node: node["id"]),
-        "edges": sorted(edges, key=lambda edge: (edge["source"], edge["edge_type"], edge["target"])),
+        "edges": sorted(
+            edges, key=lambda edge: (edge["source"], edge["edge_type"], edge["target"])
+        ),
     }
 
 
@@ -742,6 +811,8 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
     formex_path = find_formex_csv(root)
     settings = load_settings(root / "config" / "settings.yaml")
     prepared = prepare_formex_dataframe(load_formex(formex_path))
+    contract = load_contract("formex", root)
+    contract_validation = validate_dataframe(prepared, contract)
     selected_scenario = select_scenario(prepared, settings.project.default_scenario)
     crosscuts = filter_pit_production(
         prepared,
@@ -868,7 +939,9 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
             data=q3_data,
             summary=_summary_for_ranked_data(q3_data, "site", "site", "Federal Site Splits"),
             limitations=common_limitations
-            + ["Site totals use Federal Site Splits and should not replace Federal Crosscuts portfolio totals."],
+            + [
+                "Site totals use Federal Site Splits and should not replace Federal Crosscuts portfolio totals."
+            ],
             lineage=_source_row_lineage(site_splits),
             metric_cards=[
                 {
@@ -901,7 +974,9 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
             data=q4_data,
             summary=_summary_for_q4(q4_data),
             limitations=common_limitations
-            + ["Rows without Program Request are grouped as 'Unspecified program request' and separately flagged in Q5."],
+            + [
+                "Rows without Program Request are grouped as 'Unspecified program request' and separately flagged in Q5."
+            ],
             lineage=_source_row_lineage(
                 crosscuts.loc[crosscuts["funding_level_normalized"].isin(["ROT", "UFR"])]
             ),
@@ -931,7 +1006,9 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
             data=q5_data,
             summary=_summary_for_q5(q5_data),
             limitations=common_limitations
-            + ["Missing optional FORMEX fields are reported as not evaluated; findings are review triggers, not confirmed errors."],
+            + [
+                "Missing optional FORMEX fields are reported as not evaluated; findings are review triggers, not confirmed errors."
+            ],
             lineage={
                 "federal_crosscuts": _source_row_lineage(crosscuts),
                 "federal_site_splits": _source_row_lineage(site_splits),
@@ -967,7 +1044,9 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
             data=q6_data,
             summary=_summary_for_q6(q6_summary),
             limitations=common_limitations
-            + ["Reconciliation compares two overlapping submission layers with different intended analytic grain; a variance requires analyst review."],
+            + [
+                "Reconciliation compares two overlapping submission layers with different intended analytic grain; a variance requires analyst review."
+            ],
             lineage={
                 "federal_crosscuts": _source_row_lineage(crosscuts),
                 "federal_site_splits": _source_row_lineage(site_splits),
@@ -988,7 +1067,6 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
         ),
     }
 
-    output_dir = root / "data" / "curated" / "dashboard_payloads" / DASHBOARD_ID
     payload_files = {
         "q1": "q1_funding_by_year_level.json",
         "q2": "q2_funding_by_organization.json",
@@ -997,41 +1075,87 @@ def build_dashboard_01_payloads(project_root: Path | None = None) -> dict[str, A
         "q5": "q5_data_quality_findings.json",
         "q6": "q6_crosscuts_site_splits_reconciliation.json",
     }
-    for question_id, filename in payload_files.items():
-        _write_json(output_dir / filename, payloads[question_id])
+    from cepe_fynsp.dashboards.dashboard_support import make_payload, write_dashboard_artifacts
 
-    graph = build_dashboard_01_graph(payloads)
-    _write_json(root / "data" / "ontology" / f"{DASHBOARD_ID}_graph.json", graph)
-    _write_rag_context(
-        root / "data" / "curated" / "rag_chunks" / DASHBOARD_ID / "dashboard_01_context.jsonl",
-        payloads,
-    )
-    manifest = {
-        "schema_version": "1.0",
-        "dashboard_id": DASHBOARD_ID,
-        "title": DASHBOARD_TITLE,
-        "generated_at": generated_at,
-        "pipeline_version": PIPELINE_VERSION,
-        "git_commit": metadata.git_commit,
+    combined = pd.concat([crosscuts, site_splits], ignore_index=True)
+    combined_health = financial_completeness(combined)
+    metadata_v2 = {
+        "generated_at": metadata.generated_at,
         "source_file": metadata.source_file,
         "source_file_sha256": metadata.source_file_sha256,
-        "filters": base_filter,
-        "payloads": [
-            {
-                "question_id": question_id,
-                "chart_id": payloads[question_id]["chart_id"],
-                "question_text": QUESTION_TEXT[question_id],
-                "file": payload_files[question_id],
-                "record_count": payloads[question_id]["traceability"]["record_count"],
-            }
-            for question_id in payload_files
-        ],
-        "limitations": common_limitations,
-        "rag_context_file": "data/curated/rag_chunks/dashboard_01_pit_production/dashboard_01_context.jsonl",
-        "ontology_graph_file": "data/ontology/dashboard_01_pit_production_graph.json",
+        "git_commit": metadata.git_commit,
+        "base_filter": base_filter,
+        "contract_version": contract.contract_version,
+        "contract_validation_status": contract_validation.status,
+        "layer_health": {
+            CROSSCUTS_SUBMISSION_TYPE: financial_completeness(crosscuts),
+            SITE_SPLITS_SUBMISSION_TYPE: financial_completeness(site_splits),
+            f"{CROSSCUTS_SUBMISSION_TYPE} and {SITE_SPLITS_SUBMISSION_TYPE}": combined_health,
+        },
+        "data_health": {
+            "source_dataset_identity": "FORMEX",
+            "source_file": metadata.source_file,
+            "source_file_date": datetime.fromtimestamp(formex_path.stat().st_mtime, tz=UTC)
+            .date()
+            .isoformat(),
+            "dashboard_generation_date": generated_at,
+            "scenario": selected_scenario,
+            "submission_layer": [CROSSCUTS_SUBMISSION_TYPE, SITE_SPLITS_SUBMISSION_TYPE],
+            "fiscal_year_scope": sorted(
+                int(value) for value in prepared["fiscal_year_number"].dropna().unique().tolist()
+            ),
+            "source_rows_considered": len(prepared),
+            "rows_included": len(combined),
+            "rows_excluded": len(prepared) - len(combined),
+            "blank_monetary_values": combined_health["blank_amount_row_count"],
+            "invalid_monetary_values": combined_health["invalid_amount_row_count"],
+            "quality_check_summary": "Executable FORMEX contract and monetary parsing passed before aggregation.",
+            "reconciliation_status": (
+                "reconciled" if q6_summary["variance_amount"] == 0 else "variance_requires_review"
+            ),
+            "overall_status": (
+                "RED"
+                if combined_health["invalid_amount_row_count"]
+                else "AMBER"
+                if combined_health["blank_amount_row_count"]
+                else "GREEN"
+            ),
+            "status_rule": "RED for invalid amounts; AMBER for blank/excluded amounts; GREEN when all included amounts are valid.",
+        },
     }
-    _write_json(output_dir / "manifest.json", manifest)
-    LOGGER.info("Generated Dashboard 1 payloads in %s", output_dir)
+    shared_payloads: dict[str, dict[str, Any]] = {}
+    for question_id, payload in payloads.items():
+        traceability = payload["traceability"]
+        shared_payloads[question_id] = make_payload(
+            dashboard_id=DASHBOARD_ID,
+            dashboard_title=DASHBOARD_TITLE,
+            question_id=question_id,
+            question_text=QUESTION_TEXT[question_id],
+            chart_type=payload["chart_type"],
+            chart_title=payload["chart_title"],
+            metric_definition=payload["metric_definition"],
+            source_submission_type=traceability["source_submission_type"],
+            row_filter=traceability["row_filter"],
+            grouping_columns=traceability["grouping_columns"],
+            value_column=traceability["value_column"],
+            record_count=traceability["record_count"],
+            data=payload["data"],
+            summary=payload["plain_language_summary"],
+            limitations=traceability["limitations"],
+            lineage=traceability["lineage"],
+            metric_cards=payload["metric_cards"],
+            metadata=metadata_v2,
+        )
+    manifest = write_dashboard_artifacts(
+        root=root,
+        dashboard_id=DASHBOARD_ID,
+        dashboard_title=DASHBOARD_TITLE,
+        payloads=shared_payloads,
+        payload_files=payload_files,
+        metadata=metadata_v2,
+        limitations=common_limitations,
+    )
+    LOGGER.info("Generated Dashboard 1 payloads through shared v2 infrastructure.")
     return manifest
 
 

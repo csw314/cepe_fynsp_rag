@@ -3,23 +3,47 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>CEPE FYNSP Program Review Dashboards</title>
+  <title>CEPE FYNSP Executive Portfolio Summary</title>
   <link rel="stylesheet" href="assets/css/site.css">
 </head>
 <body>
-  <main class="page-shell">
+  <a class="skip-link" href="#main-content">Skip to portfolio summary</a>
+  <nav class="suite-nav" aria-label="Dashboard suite"><ul>
+    <li><a href="index.html" aria-current="page">Portfolio summary</a></li>
+    <li><a href="dashboards/01_overview/index.html">Overview</a></li>
+    <li><a href="dashboards/02_acquisition/index.html">Acquisition and Schedule</a></li>
+    <li><a href="dashboards/03_site_capacity/index.html">Site Capacity</a></li>
+    <li><a href="dashboards/04_priority_challenge/index.html">Priority Challenges</a></li>
+    <li><a href="dashboards/05_findings_report_generator/index.html">Findings and Report</a></li>
+  </ul></nav>
+  <main class="page-shell" id="main-content">
     <header class="hero">
       <p class="eyebrow">FYNSP 2028 Program Review</p>
-      <h1>CEPE Accuracy and Thoroughness Dashboard Suite</h1>
-      <p>Static HTML dashboard suite backed by Python-generated data payloads, ontology context, and AskSage RAG summaries.</p>
+      <h1>CEPE Pit Production Executive Portfolio Summary</h1>
+      <p>A generated, aggregate-only view of programmed funding, above-baseline pressure, data completeness, reconciliation, concentrations, findings, and priority actions.</p>
+      <p class="generation-status" id="landing-generation" role="status">Loading the generated portfolio summary…</p>
     </header>
-    <section class="card-grid">
-      <a class="card" href="dashboards/01_overview/index.html"><h2>1. Overview · Implemented</h2><p>Pit Production funding, ownership, site distribution, above-baseline drivers, quality checks, and reconciliation.</p></a>
-      <a class="card" href="dashboards/02_acquisition/index.html"><h2>2. Acquisition · Implemented</h2><p>Acquisition type, schedule metadata, major lines, LI TEC/OPC concentration, and above-baseline priority.</p></a>
-      <a class="card" href="dashboards/03_site_capacity/index.html"><h2>3. Site Capacity · Implemented</h2><p>Site concentration, funding changes, above-baseline dependence, integration dependencies, and funding surges.</p></a>
-      <a class="card" href="dashboards/04_priority_challenge/index.html"><h2>4. Priority Challenge · Implemented</h2><p>ROT/UFR drivers, Tier 1 above-baseline flags, priority uniqueness, offsets, and traceability.</p></a>
-      <a class="card" href="dashboards/05_findings_report_generator/index.html"><h2>5. Findings and Report · Implemented</h2><p>Accuracy findings, thoroughness findings, risk/opportunity heatmap, citation lineage, and report manifest preparation.</p></a>
+    <section class="portfolio-metrics" aria-labelledby="portfolio-heading">
+      <h2 id="portfolio-heading">Portfolio status</h2>
+      <div class="metric-summary" id="landing-metrics" aria-live="polite"></div>
+      <p class="panel-note" id="landing-health"></p>
+    </section>
+    <section class="priority-actions" aria-labelledby="actions-heading">
+      <h2 id="actions-heading">Highest-priority review actions</h2>
+      <ol id="landing-actions"><li>Loading generated actions…</li></ol>
+    </section>
+    <section aria-labelledby="dashboards-heading">
+      <h2 id="dashboards-heading">Question-oriented analytical dashboards</h2>
+      <div class="card-grid">
+        <a class="card" href="dashboards/01_overview/index.html"><h2>1. Overview</h2><p>Funding, ownership, site distribution, above-baseline drivers, quality checks, and reconciliation.</p></a>
+        <a class="card" href="dashboards/02_acquisition/index.html"><h2>2. Acquisition and Schedule</h2><p>Acquisition classification, schedule evidence, material lines, site concentration, and priority.</p></a>
+        <a class="card" href="dashboards/03_site_capacity/index.html"><h2>3. Site Capacity</h2><p>Site concentration, annual changes, above-baseline dependency, integration burden, and surges.</p></a>
+        <a class="card" href="dashboards/04_priority_challenge/index.html"><h2>4. Priority Challenges</h2><p>ROT/UFR drivers, Tier 1 flags, ranking uniqueness, offsets, and traceability.</p></a>
+        <a class="card" href="dashboards/05_findings_report_generator/index.html"><h2>5. Findings and Report</h2><p>Operational findings, evidence paths, exhibit readiness, dispositions, and report outputs.</p></a>
+      </div>
     </section>
   </main>
+  <script src="assets/js/dashboard.js"></script>
+  <script src="assets/js/landing.js"></script>
 </body>
 </html>

@@ -4,14 +4,15 @@ project:
   default_scenario: FY28/32 - REV3 TARGETFRS (ALL NNSA)
 
 paths:
-  raw_formex: data/raw/formex/CSV Download (5).csv
-  raw_planex: data/raw/planex/staging_idw_planex_202607151621.csv
-  raw_costex: data/raw/costex/staging_idw_costex_202607151618.csv
+  raw_formex: data/raw/formex/CSV Download.csv
+  raw_planex: data/raw/planex/idw_planex_202607171050.csv
+  raw_costex: data/raw/costex/idw_costex_202607171052.csv
   interim_dir: data/interim
   curated_dir: data/curated
   ontology_dir: data/ontology
   dashboard_payload_dir: data/curated/dashboard_payloads
   reports_dir: data/reports
+  finding_dispositions: data/curated/finding_dispositions.json
 
 formex:
   encoding: utf-16
@@ -19,6 +20,25 @@ formex:
   amount_column: formulated_measure
   default_total_submission_type: Federal Crosscuts
   site_submission_type: Federal Site Splits
+  allowed_submission_types:
+    - Federal Crosscuts
+    - Federal Site Splits
+    - GPRA Constraints
+    - Federal STAT Table
+  allowed_fiscal_years: [2028, 2029, 2030, 2031, 2032]
+
+dashboards:
+  schema_version: "2.0"
+  lineage_sample_limit: 250
+  table_page_size: 25
+  client_filter_dimensions:
+    - fiscal_year
+    - funding_level
+    - organization
+    - site
+    - doe_priority_tier
+    - acquisition_type
+    - severity
 
 asksage:
   instance_env: ASKSAGE_INSTANCE
@@ -26,3 +46,22 @@ asksage:
   api_key_env: ASKSAGE_API_KEY
   access_token_env: ASKSAGE_ACCESS_TOKEN
   model_env: ASKSAGE_MODEL
+  approved_hosts:
+    - api.asksage.ai
+  connect_timeout_seconds: 10
+  read_timeout_seconds: 60
+  max_retries: 3
+  backoff_factor: 0.5
+
+report:
+  title: CEPE Pit Production FYNSP Program Review
+  target_pages: 5-7
+  docx_subdir: docx
+  html_subdir: html
+  exhibit_subdir: exhibits
+
+quality:
+  materiality_dollars: 100000000
+  site_yoy_change: 0.25
+  reconciliation_dollars: 1
+  amber_completeness_percentage: 99

@@ -1,10 +1,12 @@
-# Raw data directory
+# Raw source directory
 
-Place raw files here. These files are intentionally ignored by git in this scaffold.
+Raw source files are immutable inputs and are intentionally ignored by Git. Pipeline code must never overwrite them.
 
-Expected locations:
+Configured locations:
 
-- `data/raw/formex/CSV Download (5).csv`
-- `data/raw/planex/staging_idw_planex_202607151621.csv`
-- `data/raw/costex/staging_idw_costex_202607151618.csv`
-- `data/raw/docs/*.docx` or `data/raw/docs/*.pdf`
+- `formex/CSV Download.csv` — UTF-16, tab-delimited FORMEX.
+- `planex/idw_planex_202607171050.csv` — comma-delimited PLANEX.
+- `costex/idw_costex_202607171052.csv` — comma-delimited COSTEX.
+- `docs/` — approved guidance documents, when available.
+
+Update `config/settings.yaml` and the corresponding executable contract under `config/data_contracts/` when an authorized export name or structure changes. Do not commit raw exports, credentials, classified material, controlled rows, generated reports, or copied source samples.

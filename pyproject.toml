@@ -4,22 +4,15 @@ version = "0.1.0"
 description = "CEPE FYNSP program review dashboard suite"
 requires-python = ">=3.11"
 dependencies = [
-  "pandas>=2.2",
-  "polars>=1.0",
-  "duckdb>=1.0",
-  "pyarrow>=15.0",
-  "pydantic>=2.7",
-  "pydantic-settings>=2.2",
-  "python-dotenv>=1.0",
-  "PyYAML>=6.0",
-  "requests>=2.31",
-  "networkx>=3.3",
-  "rdflib>=7.0",
-  "jinja2>=3.1",
-  "plotly>=5.22",
-  "python-docx>=1.1",
-  "typer>=0.12",
-  "rich>=13.7"
+  "pandas>=2.2,<3",
+  "duckdb>=1.0,<2",
+  "pyarrow>=15.0,<24",
+  "pydantic>=2.7,<3",
+  "PyYAML>=6.0,<7",
+  "requests>=2.31,<3",
+  "networkx>=3.3,<4",
+  "python-docx>=1.1,<2",
+  "Pillow>=10.4,<13"
 ]
 
 [project.optional-dependencies]
@@ -27,8 +20,19 @@ dev = [
   "pytest>=8.2",
   "ruff>=0.5",
   "mypy>=1.10",
-  "ipykernel>=6.29"
+  "types-PyYAML>=6.0",
+  "types-networkx>=3.3",
+  "types-requests>=2.31"
 ]
+notebook = [
+  "ipykernel>=6.29,<8"
+]
+
+[tool.mypy]
+python_version = "3.12"
+warn_unused_ignores = true
+no_implicit_optional = true
+ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
