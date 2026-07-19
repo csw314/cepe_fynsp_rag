@@ -15,6 +15,7 @@ __pycache__/
 /data/raw/**/*.xlsx
 /data/raw/**/*.docx
 /data/raw/**/*.pdf
+/data/raw/**/*.pptx
 /data/interim/**
 /data/curated/**
 /data/ontology/**
