@@ -35,3 +35,13 @@ documents:
     document_type: reference
     approved_for_asksage: True
     classification: cui
+  - path: "Plutonium Pit LANL 0523.pdf"
+    title: "Plutonium Pit LANL 0523"
+    document_type: reference
+    approved_for_asksage: True
+    classification: cui
+  - path: Plutonium Pit SRS 0523.pdf
+    title: Plutonium Pit SRS 0523
+    document_type: reference\
+    approved_for_asksage: True
+    classification: cui
