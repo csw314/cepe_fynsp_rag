@@ -208,7 +208,13 @@ class AskSageClient:
             headers={"Content-Type": "application/json"},
             body={"email": self.config.email, "api_key": self.config.api_key},
         )
-        token = payload.get("access_token") or payload.get("token")
+        nested_response = payload.get("response")
+        nested_token = (
+            nested_response.get("access_token") or nested_response.get("token")
+            if isinstance(nested_response, dict)
+            else None
+        )
+        token = payload.get("access_token") or payload.get("token") or nested_token
         if not isinstance(token, str) or not token:
             raise AskSageResponseError("AskSage token response did not contain a usable token.")
         expires_in = payload.get("expires_in", 900)

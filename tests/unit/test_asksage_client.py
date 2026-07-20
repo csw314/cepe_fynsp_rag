@@ -159,3 +159,14 @@ def test_token_exchange_is_cached_and_used_as_bearer() -> None:
     assert all(
         call["headers"]["Authorization"] == "Bearer short-lived-token" for call in chat_calls
     )
+
+
+def test_token_exchange_accepts_nested_response_token() -> None:
+    session = FakeSession(
+        [FakeResponse({"response": {"access_token": "nested-token"}, "status": "200"})]
+    )
+    client = AskSageClient(_config(), session=session)  # type: ignore[arg-type]
+
+    assert client.get_access_token() == "nested-token"
+    assert client.get_access_token() == "nested-token"
+    assert len(session.calls) == 1
