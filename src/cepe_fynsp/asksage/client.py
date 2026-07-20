@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import json
 import os
 import time
 import uuid
@@ -93,9 +94,15 @@ class AskSageConfig:
 class AskSageClient:
     """Reusable, retrying requests client that logs metadata only."""
 
-    def __init__(self, config: AskSageConfig, session: requests.Session | None = None):
+    def __init__(
+        self,
+        config: AskSageConfig,
+        session: requests.Session | None = None,
+        upload_session: requests.Session | None = None,
+    ):
         self.config = config
         self.session = session or requests.Session()
+        self.upload_session = upload_session or requests.Session()
         retry = Retry(
             total=config.max_retries,
             connect=config.max_retries,
@@ -110,6 +117,7 @@ class AskSageClient:
         )
         adapter = HTTPAdapter(max_retries=retry)
         self.session.mount("https://", adapter)
+        self.upload_session.mount("https://", HTTPAdapter(max_retries=Retry(total=0)))
         self._cached_token: str | None = config.access_token
         self._token_expires_at = float("inf") if config.access_token else 0.0
 
@@ -195,6 +203,73 @@ class AskSageClient:
         LOGGER.info("AskSage request completed request_id=%s", request_id)
         return payload
 
+    def _post_multipart(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        data: dict[str, str],
+        file_content: bytes,
+        filename: str,
+        mime_type: str,
+    ) -> dict[str, Any]:
+        """Send one non-retrying multipart request without logging its prompt or file."""
+        request_id = str(uuid.uuid4())
+        safe_headers = {**headers, "X-Request-ID": request_id, "Accept": "application/json"}
+        LOGGER.info(
+            "AskSage file request started request_id=%s endpoint=%s",
+            request_id,
+            urlparse(url).path,
+        )
+        try:
+            response = self.upload_session.post(
+                url,
+                headers=safe_headers,
+                data=data,
+                files=[("file", (filename, file_content, mime_type))],
+                timeout=self.config.timeout,
+            )
+        except (requests.Timeout, requests.ConnectionError) as exc:
+            LOGGER.warning(
+                "AskSage file request unavailable request_id=%s error_type=%s",
+                request_id,
+                type(exc).__name__,
+            )
+            raise AskSageUnavailableError(
+                f"AskSage file request unavailable (request_id={request_id})."
+            ) from exc
+        except requests.RequestException as exc:
+            raise AskSageResponseError(
+                f"AskSage file request failed (request_id={request_id})."
+            ) from exc
+        if response.status_code >= 500 or response.status_code in {408, 413, 425, 429}:
+            raise AskSageUnavailableError(
+                f"AskSage file service unavailable with HTTP {response.status_code} "
+                f"(request_id={request_id})."
+            )
+        if response.status_code >= 400:
+            raise AskSageResponseError(
+                f"AskSage rejected the file request with HTTP {response.status_code} "
+                f"(request_id={request_id})."
+            )
+        if "application/json" not in response.headers.get("Content-Type", "").casefold():
+            raise AskSageResponseError(
+                f"AskSage returned an unexpected file-response content type "
+                f"(request_id={request_id})."
+            )
+        try:
+            payload = response.json()
+        except requests.JSONDecodeError as exc:
+            raise AskSageResponseError(
+                f"AskSage returned invalid file-response JSON (request_id={request_id})."
+            ) from exc
+        if not isinstance(payload, dict):
+            raise AskSageResponseError(
+                f"AskSage returned an unexpected file-response schema (request_id={request_id})."
+            )
+        LOGGER.info("AskSage file request completed request_id=%s", request_id)
+        return payload
+
     def get_access_token(self, *, force_refresh: bool = False) -> str:
         """Return a cached token or exchange email/API key through the User API."""
         if not force_refresh and self._cached_token and time.time() < self._token_expires_at - 30:
@@ -252,6 +327,43 @@ class AskSageClient:
             f"{self.config.server_base_url}/query",
             headers={"x-access-tokens": token, "Content-Type": "application/json"},
             body={"message": prompt, **kwargs},
+        )
+
+    def query_with_file(
+        self,
+        message: str | list[dict[str, str]],
+        *,
+        file_content: bytes,
+        filename: str,
+        mime_type: str,
+        system_prompt: str | None = None,
+        dataset: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.0,
+        limit_references: int = 1,
+    ) -> dict[str, Any]:
+        """Call the documented non-retrying multipart query-with-file endpoint."""
+        token = self.config.access_token or self.get_access_token()
+        data = {
+            "message": json.dumps(message, ensure_ascii=False),
+            "model": model or self.config.model,
+            "temperature": str(temperature),
+            "limit_references": str(limit_references),
+            "live": "0",
+            "streaming": "false",
+            "usage": "true",
+        }
+        if system_prompt is not None:
+            data["system_prompt"] = system_prompt
+        if dataset is not None:
+            data["dataset"] = dataset
+        return self._post_multipart(
+            f"{self.config.server_base_url}/query_with_file",
+            headers={"x-access-tokens": token},
+            data=data,
+            file_content=file_content,
+            filename=filename,
+            mime_type=mime_type,
         )
 
     def safe_chat_completion(self, messages: list[dict[str, str]], **kwargs: Any) -> dict[str, Any]:

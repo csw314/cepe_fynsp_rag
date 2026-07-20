@@ -54,9 +54,18 @@ def validate_static(project_root: Path) -> None:
         "payload.columns",
         "Export filtered aggregate CSV",
         "aria-sort",
+        "Get Insights",
+        "Summarize Data",
+        "Write Your Own Query",
+        "aria-expanded",
+        "AbortController",
+        "captureVisualization",
+        "textContent",
     ):
         if behavior not in renderer:
             raise ValueError(f"Shared renderer is missing acceptance behavior: {behavior}")
+    if "Which fiscal year and funding level drives" in renderer:
+        raise ValueError("Prepared questions must not be duplicated in browser JavaScript.")
     secret_markers = ("ASKSAGE_API_KEY", "ASKSAGE_ACCESS_TOKEN", "x-access-tokens")
     for path in asset_files:
         content = path.read_text(encoding="utf-8")

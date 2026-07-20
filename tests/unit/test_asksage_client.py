@@ -170,3 +170,34 @@ def test_token_exchange_accepts_nested_response_token() -> None:
     assert client.get_access_token() == "nested-token"
     assert client.get_access_token() == "nested-token"
     assert len(session.calls) == 1
+
+
+def test_query_with_file_uses_verified_multipart_contract_without_prompt_logging(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    upload = FakeSession([FakeResponse({"message": "image description", "status": 200})])
+    client = AskSageClient(
+        _config(access_token="test-token"),
+        session=FakeSession([]),  # type: ignore[arg-type]
+        upload_session=upload,  # type: ignore[arg-type]
+    )
+    with caplog.at_level(logging.INFO):
+        response = client.query_with_file(
+            "sensitive synthetic prompt",
+            file_content=b"synthetic-png",
+            filename="chart.png",
+            mime_type="image/png",
+            system_prompt="bounded system prompt",
+            model="synthetic-model",
+        )
+    assert response["message"] == "image description"
+    assert len(upload.calls) == 1
+    call = upload.calls[0]
+    assert call["url"].endswith("/server/query_with_file")
+    assert call["headers"]["x-access-tokens"] == "test-token"
+    assert call["data"]["message"] == '"sensitive synthetic prompt"'
+    assert call["data"]["model"] == "synthetic-model"
+    assert call["files"][0][0] == "file"
+    assert call["files"][0][1][0] == "chart.png"
+    assert "sensitive synthetic prompt" not in caplog.text
+    assert "synthetic-png" not in caplog.text

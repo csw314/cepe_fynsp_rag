@@ -7,7 +7,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-SCHEMA_VERSION = "2.0"
+SCHEMA_VERSION = "2.1"
 
 
 class StrictSchema(BaseModel):
@@ -39,6 +39,14 @@ class VisualizationSpec(StrictSchema):
     sort: tuple[str, ...] = ()
     format: dict[str, str] = Field(default_factory=dict)
     accessible_description: str
+
+
+class InsightUiConfig(StrictSchema):
+    """Prepared, question-specific configuration for the shared insights control."""
+
+    enabled: bool = True
+    suggested_question: str = Field(min_length=1, max_length=2000)
+    context_version: str = "1.0"
 
 
 class MetricCard(StrictSchema):
@@ -105,6 +113,7 @@ class DashboardQuestionPayload(StrictSchema):
     data: list[dict[str, Any]]
     columns: tuple[ColumnSchema, ...]
     visualization: VisualizationSpec
+    insights: InsightUiConfig
     filter_options: dict[str, list[Any]]
     active_filter_state: dict[str, Any]
     warnings: tuple[str, ...]

@@ -42,6 +42,7 @@ from cepe_fynsp.schemas import (
     RagRecord,
     VisualizationSpec,
 )
+from cepe_fynsp.dashboards.insight_questions import insight_ui_config
 
 LINEAGE_SAMPLE_LIMIT = 250
 COMMON_LIMITATIONS = [
@@ -495,6 +496,7 @@ def make_payload(
         data=enriched_data,
         columns=_column_schemas(enriched_data),
         visualization=_visualization(chart_type, enriched_data, chart_title),
+        insights=insight_ui_config(dashboard_id, question_id),
         filter_options=_filter_options(enriched_data),
         active_filter_state=effective_filter,
         warnings=tuple(limitations),

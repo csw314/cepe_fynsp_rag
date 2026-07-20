@@ -10,7 +10,7 @@
     const status = document.getElementById('landing-generation');
     try {
       const payload = await loadDashboardPayload('../data/curated/dashboard_payloads/landing_summary.json');
-      if (payload.schema_version !== '2.0' || !Array.isArray(payload.metrics)) throw new Error('Unsupported or incomplete landing summary schema.');
+      if (payload.schema_version !== '2.1' || !Array.isArray(payload.metrics)) throw new Error('Unsupported or incomplete landing summary schema.');
       const metrics = document.getElementById('landing-metrics');
       metrics.replaceChildren();
       payload.metrics.forEach((metric) => {

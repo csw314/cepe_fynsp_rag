@@ -4,11 +4,17 @@
 
   const PAGE_SIZE = 25;
   const CHART_LIMIT = 15;
+  const INSIGHT_SCHEMA_VERSION = '1.0';
+  const MAX_INSIGHT_QUERY_LENGTH = 2000;
+  const INSIGHTS_ENDPOINT = '/api/insights';
+  const INSIGHTS_HEALTH_ENDPOINT = '/api/insights/health';
+  const insightStates = new Map();
+  let insightsHealthPromise = null;
   const MONEY = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
   const NUMBER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
   const REQUIRED_PAYLOAD_FIELDS = [
     'schema_version', 'dashboard_id', 'question_id', 'question_text', 'data', 'columns',
-    'visualization', 'filter_options', 'active_filter_state', 'quality_summary', 'traceability',
+    'visualization', 'insights', 'filter_options', 'active_filter_state', 'quality_summary', 'traceability',
     'source_metadata', 'narrative', 'ontology_references', 'generated_metadata',
   ];
 
@@ -45,9 +51,10 @@
     if (!payload || typeof payload !== 'object') throw new Error('Payload is not a JSON object.');
     const missing = REQUIRED_PAYLOAD_FIELDS.filter((field) => !(field in payload));
     if (missing.length) throw new Error(`Payload is missing required fields: ${missing.join(', ')}.`);
-    if (payload.schema_version !== '2.0') throw new Error(`Unsupported payload schema ${asText(payload.schema_version)}; expected 2.0.`);
+    if (payload.schema_version !== '2.1') throw new Error(`Unsupported payload schema ${asText(payload.schema_version)}; expected 2.1.`);
     if (!Array.isArray(payload.data) || !Array.isArray(payload.columns)) throw new Error('Payload data and columns must be arrays.');
     if (!payload.visualization.type) throw new Error('Payload visualization type is missing.');
+    if (!payload.insights || payload.insights.enabled !== true || !String(payload.insights.suggested_question || '').trim()) throw new Error('Payload insights metadata is missing.');
     return payload;
   }
 
@@ -497,6 +504,460 @@
     });
   }
 
+  function relevantInsightFilters(payload, activeFilters) {
+    const supported = new Set(Object.keys(payload.filter_options || {}));
+    return Object.fromEntries(
+      Object.entries(activeFilters)
+        .filter(([field]) => supported.has(field))
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([field, value]) => [field, [String(value)]]),
+    );
+  }
+
+  async function loadInsightsHealth() {
+    if (!insightsHealthPromise) {
+      insightsHealthPromise = (async () => {
+        const controller = new AbortController();
+        const timer = window.setTimeout(() => controller.abort(), 4000);
+        try {
+          const response = await fetch(INSIGHTS_HEALTH_ENDPOINT, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+            credentials: 'same-origin',
+            signal: controller.signal,
+          });
+          const contentType = response.headers.get('Content-Type') || '';
+          if (!response.ok || !contentType.includes('application/json')) throw new Error('Insights health endpoint unavailable.');
+          const health = await response.json();
+          if (health.schema_version !== INSIGHT_SCHEMA_VERSION || typeof health.asksage_configured !== 'boolean') throw new Error('Invalid insights health response.');
+          return health;
+        } catch (error) {
+          return {
+            schema_version: INSIGHT_SCHEMA_VERSION,
+            service_available: false,
+            asksage_configured: false,
+            image_input_supported: false,
+            document_context_available: false,
+            ontology_context_available: false,
+          };
+        } finally {
+          window.clearTimeout(timer);
+        }
+      })();
+    }
+    return insightsHealthPromise;
+  }
+
+  function setInsightState(state, name, message) {
+    state.status = name;
+    state.slot.dataset.insightsState = name;
+    state.statusRegion.textContent = message || '';
+    state.statusRegion.setAttribute('aria-busy', ['capturing_image', 'building_request', 'loading'].includes(name) ? 'true' : 'false');
+  }
+
+  function setInsightActionsDisabled(state, disabled) {
+    [state.summarizeButton, state.suggestedButton, state.customButton].forEach((button) => { button.disabled = disabled; });
+  }
+
+  function appendTextList(container, heading, values, emptyMessage) {
+    container.appendChild(el('h4', 'insights-response-subheading', heading));
+    if (!values || !values.length) {
+      container.appendChild(el('p', 'insights-empty', emptyMessage));
+      return;
+    }
+    const list = el('ul', 'insights-response-list');
+    values.forEach((value) => list.appendChild(el('li', '', String(value))));
+    container.appendChild(list);
+  }
+
+  function renderInsightResponse(state, response) {
+    state.response.replaceChildren();
+    const heading = el('h3', 'insights-response-heading', 'Insights response');
+    heading.tabIndex = -1;
+    state.response.appendChild(heading);
+    const statusLabel = String(response.status || 'error').replaceAll('_', ' ');
+    state.response.appendChild(el('p', 'insights-answer-status', `Status: ${statusLabel}`));
+    state.response.appendChild(el('h4', 'insights-response-subheading', 'Answer'));
+    state.response.appendChild(el('p', 'insights-answer', response.answer || 'No grounded answer was returned.'));
+    appendTextList(state.response, 'Key observations', response.key_observations, 'No key observations were returned.');
+    appendTextList(state.response, 'Review triggers', response.review_triggers, 'No additional review triggers were returned.');
+    appendTextList(state.response, 'Limitations', response.limitations, 'No additional limitations were returned.');
+
+    state.response.appendChild(el('h4', 'insights-response-subheading', 'Citations'));
+    if (Array.isArray(response.citations) && response.citations.length) {
+      const citations = el('ol', 'insights-citations');
+      response.citations.forEach((citation) => {
+        const type = titleCase(citation.type || 'evidence');
+        const location = [citation.source_file_id, citation.page ? `page ${citation.page}` : null, citation.section].filter(Boolean).join(' · ');
+        const item = el('li');
+        item.appendChild(el('strong', '', `${type}: `));
+        item.appendChild(document.createTextNode(`${citation.label || citation.id} [${citation.id}]${location ? ` · ${location}` : ''}`));
+        citations.appendChild(item);
+      });
+      state.response.appendChild(citations);
+    } else {
+      state.response.appendChild(el('p', 'insights-empty', 'No validated evidence citations were returned.'));
+    }
+
+    const context = response.context_used;
+    state.response.appendChild(el('h4', 'insights-response-subheading', 'Context used'));
+    if (context) {
+      const details = el('dl', 'insights-context-list');
+      [
+        ['Active filters interpreted by server', JSON.stringify(context.active_filter_state || {})],
+        ['Visualization image used', context.image_used ? 'Yes' : 'No'],
+        ['Ontology nodes / edges', `${(context.ontology_node_ids || []).length} / ${(context.ontology_edge_ids || []).length}`],
+        ['Document chunks', (context.guidance_chunk_ids || []).length],
+        ['Context truncated', context.context_truncated ? 'Yes' : 'No'],
+      ].forEach(([label, value]) => details.append(el('dt', '', label), el('dd', '', String(value))));
+      state.response.appendChild(details);
+    } else {
+      state.response.appendChild(el('p', 'insights-empty', 'No authoritative context packet was accepted.'));
+    }
+    state.response.appendChild(el('h4', 'insights-response-subheading', 'AI status'));
+    const requestId = response.ai_metadata?.request_id || 'Not available';
+    state.response.appendChild(el('p', 'ai-review-status', `AI-generated—review required · Request ID: ${requestId}`));
+    heading.focus();
+  }
+
+  function bytesToBase64(bytes) {
+    let binary = '';
+    const chunkSize = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunkSize) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+    }
+    return window.btoa(binary);
+  }
+
+  function cssPixels(value) {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function drawWrappedText(context, text, x, y, maxWidth, lineHeight, maxHeight, align) {
+    const words = text.split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+    words.forEach((word) => {
+      const candidate = line ? `${line} ${word}` : word;
+      if (line && context.measureText(candidate).width > maxWidth) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = candidate;
+      }
+    });
+    if (line) lines.push(line);
+    lines.slice(0, Math.max(1, Math.floor(maxHeight / lineHeight))).forEach((value, index) => {
+      const width = context.measureText(value).width;
+      const offset = align === 'right' ? maxWidth - width : align === 'center' ? (maxWidth - width) / 2 : 0;
+      context.fillText(value, x + Math.max(0, offset), y + index * lineHeight);
+    });
+  }
+
+  async function imageFromUrl(url) {
+    const image = new Image();
+    image.decoding = 'sync';
+    await new Promise((resolve, reject) => {
+      image.onload = resolve;
+      image.onerror = () => reject(new Error('A visualization image component could not be captured.'));
+      image.src = url;
+    });
+    return image;
+  }
+
+  async function drawDomElement(context, element, rootBounds) {
+    if (!(element instanceof Element)) return;
+    const style = window.getComputedStyle(element);
+    const bounds = element.getBoundingClientRect();
+    if (style.display === 'none' || style.visibility === 'hidden' || Number(style.opacity) === 0 || !bounds.width || !bounds.height) return;
+    const x = bounds.left - rootBounds.left;
+    const y = bounds.top - rootBounds.top;
+    if (x + bounds.width < 0 || y + bounds.height < 0 || x > rootBounds.width || y > rootBounds.height) return;
+    if (style.backgroundColor && style.backgroundColor !== 'transparent' && style.backgroundColor !== 'rgba(0, 0, 0, 0)') {
+      context.fillStyle = style.backgroundColor;
+      context.fillRect(x, y, bounds.width, bounds.height);
+    }
+    const borderWidth = cssPixels(style.borderTopWidth);
+    if (borderWidth > 0 && style.borderTopStyle !== 'none') {
+      context.strokeStyle = style.borderTopColor;
+      context.lineWidth = borderWidth;
+      context.strokeRect(x + borderWidth / 2, y + borderWidth / 2, Math.max(0, bounds.width - borderWidth), Math.max(0, bounds.height - borderWidth));
+    }
+    if (element instanceof HTMLCanvasElement) {
+      context.drawImage(element, x, y, bounds.width, bounds.height);
+      return;
+    }
+    if (element instanceof SVGElement && element.tagName.toLocaleLowerCase() === 'svg') {
+      const serialized = new XMLSerializer().serializeToString(element);
+      const url = URL.createObjectURL(new Blob([serialized], { type: 'image/svg+xml;charset=utf-8' }));
+      try {
+        context.drawImage(await imageFromUrl(url), x, y, bounds.width, bounds.height);
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+      return;
+    }
+    const directText = [...element.childNodes]
+      .filter((node) => node.nodeType === Node.TEXT_NODE)
+      .map((node) => node.textContent || '')
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (directText) {
+      const fontSize = cssPixels(style.fontSize) || 14;
+      const lineHeight = cssPixels(style.lineHeight) || fontSize * 1.25;
+      const paddingLeft = cssPixels(style.paddingLeft);
+      const paddingRight = cssPixels(style.paddingRight);
+      const paddingTop = cssPixels(style.paddingTop);
+      context.font = `${style.fontStyle} ${style.fontWeight} ${fontSize}px ${style.fontFamily}`;
+      context.fillStyle = style.color || '#152532';
+      context.textBaseline = 'top';
+      drawWrappedText(
+        context,
+        directText,
+        x + paddingLeft,
+        y + paddingTop,
+        Math.max(1, bounds.width - paddingLeft - paddingRight),
+        lineHeight,
+        Math.max(lineHeight, bounds.height - paddingTop),
+        style.textAlign,
+      );
+    }
+    for (const child of element.children) await drawDomElement(context, child, rootBounds);
+  }
+
+  async function captureVisualization(target) {
+    if (!target || !window.crypto?.subtle) throw new Error('Native chart capture is unavailable.');
+    const bounds = target.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) throw new Error('The visualization has no rendered dimensions.');
+    const scale = Math.min(2, 1600 / bounds.width, 1200 / bounds.height);
+    const width = Math.max(1, Math.round(bounds.width * scale));
+    const height = Math.max(1, Math.round(bounds.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d', { alpha: false });
+    if (!context) throw new Error('Canvas capture is unavailable.');
+    context.fillStyle = '#ffffff';
+    context.fillRect(0, 0, width, height);
+    context.setTransform(scale, 0, 0, scale, 0, 0);
+    await drawDomElement(context, target, bounds);
+    context.setTransform(1, 0, 0, 1, 0, 0);
+    const blob = await new Promise((resolve, reject) => canvas.toBlob((value) => value ? resolve(value) : reject(new Error('PNG encoding failed.')), 'image/png'));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const digest = new Uint8Array(await window.crypto.subtle.digest('SHA-256', bytes));
+    return {
+      mime_type: 'image/png',
+      data_base64: bytesToBase64(bytes),
+      width,
+      height,
+      sha256: [...digest].map((value) => value.toString(16).padStart(2, '0')).join(''),
+    };
+  }
+
+  function closeInsights(state) {
+    if (state.controller) state.controller.abort();
+    state.sequence += 1;
+    state.controller = null;
+    state.open = false;
+    state.card.hidden = true;
+    state.toggle.setAttribute('aria-expanded', 'false');
+    state.cancelButton.hidden = true;
+    setInsightState(state, 'closed', 'Insights card closed.');
+    state.toggle.focus();
+  }
+
+  async function openInsights(state) {
+    state.open = true;
+    state.card.hidden = false;
+    state.toggle.setAttribute('aria-expanded', 'true');
+    setInsightState(state, 'ready', 'Checking secure insights availability.');
+    state.heading.focus();
+    const health = await loadInsightsHealth();
+    if (!state.open) return;
+    state.health = health;
+    if (!health.service_available || !health.asksage_configured) {
+      setInsightActionsDisabled(state, true);
+      setInsightState(state, 'unavailable', 'Live insights are unavailable. The dashboard and deterministic analysis remain available.');
+      return;
+    }
+    setInsightActionsDisabled(state, false);
+    setInsightState(state, 'ready', 'Evidence-grounded live insights are available.');
+  }
+
+  function cancelInsightRequest(state) {
+    if (state.controller) state.controller.abort();
+    state.sequence += 1;
+    state.controller = null;
+    state.cancelButton.hidden = true;
+    setInsightActionsDisabled(state, false);
+    setInsightState(state, 'cancelled', 'Insight request cancelled.');
+  }
+
+  async function submitInsight(state, action) {
+    const query = action === 'custom_query' ? state.textarea.value : null;
+    if (action === 'custom_query' && !String(query || '').trim()) {
+      setInsightState(state, 'error', 'Enter a question before selecting Write Your Own Query.');
+      state.textarea.focus();
+      return;
+    }
+    const activeFilterState = relevantInsightFilters(state.payload, state.activeFilters);
+    const signature = JSON.stringify([action, activeFilterState, query]);
+    if (state.controller && state.activeSignature === signature) return;
+    if (state.controller) state.controller.abort();
+    state.activeSignature = signature;
+    state.sequence += 1;
+    const sequence = state.sequence;
+    const controller = new AbortController();
+    state.controller = controller;
+    state.cancelButton.hidden = false;
+    setInsightActionsDisabled(state, true);
+    setInsightState(state, 'capturing_image', 'Capturing the currently displayed visualization.');
+    let chartImage = null;
+    let imageCaptureStatus = 'failed';
+    try {
+      chartImage = await captureVisualization(state.captureTarget);
+      imageCaptureStatus = 'captured';
+    } catch (error) {
+      imageCaptureStatus = 'unavailable';
+    }
+    if (sequence !== state.sequence) return;
+    setInsightState(state, 'building_request', 'Building the validated insight request.');
+    const request = {
+      schema_version: INSIGHT_SCHEMA_VERSION,
+      dashboard_id: state.payload.dashboard_id,
+      question_id: state.payload.question_id,
+      chart_id: state.payload.chart_id,
+      action,
+      active_filter_state: activeFilterState,
+      query,
+      chart_image: chartImage,
+      client_metadata: {
+        image_capture_status: imageCaptureStatus,
+        device_pixel_ratio: Math.min(4, Math.max(0.5, window.devicePixelRatio || 1)),
+      },
+    };
+    setInsightState(state, 'loading', 'AskSage is analyzing the validated evidence.');
+    let timedOut = false;
+    const timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 70000);
+    try {
+      const response = await fetch(INSIGHTS_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(request),
+        signal: controller.signal,
+      });
+      const contentType = response.headers.get('Content-Type') || '';
+      if (!contentType.includes('application/json')) throw new Error('The insights service returned an unsupported response.');
+      const payload = await response.json();
+      if (sequence !== state.sequence) return;
+      renderInsightResponse(state, payload);
+      const nextState = payload.status === 'answered' ? 'answered' : payload.status === 'insufficient_evidence' ? 'insufficient_evidence' : payload.status === 'unavailable' ? 'unavailable' : 'error';
+      setInsightState(state, nextState, payload.status === 'answered' ? 'Insight response received. AI-generated—review required.' : (payload.limitations || ['The insight request did not produce an answer.'])[0]);
+    } catch (error) {
+      if (sequence !== state.sequence) return;
+      if (error.name === 'AbortError') {
+        setInsightState(state, timedOut ? 'error' : 'cancelled', timedOut ? 'The insight request timed out. Deterministic analysis remains available.' : 'Insight request cancelled.');
+      } else {
+        setInsightState(state, 'unavailable', 'Live insights are unavailable. The dashboard and deterministic analysis remain available.');
+      }
+    } finally {
+      window.clearTimeout(timer);
+      if (sequence === state.sequence) {
+        state.controller = null;
+        state.cancelButton.hidden = true;
+        setInsightActionsDisabled(state, !state.health?.asksage_configured);
+      }
+    }
+  }
+
+  function createInsightsState(payload, activeFilters, captureTarget) {
+    const slot = el('section', 'insights-slot');
+    slot.dataset.chartId = payload.chart_id;
+    const cardId = `${payload.chart_id}_insights_card`;
+    const toggle = el('button', 'insights-toggle', 'Get Insights');
+    toggle.type = 'button';
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-controls', cardId);
+    toggle.setAttribute('aria-label', `Get insights for ${payload.chart_title}`);
+    const card = el('div', 'insights-card');
+    card.id = cardId;
+    card.hidden = true;
+    const header = el('div', 'insights-card-header');
+    const heading = el('h3', 'insights-card-heading', `Get insights for ${payload.chart_title}`);
+    heading.id = `${cardId}_heading`;
+    heading.tabIndex = -1;
+    const closeButton = el('button', 'insights-close', 'Close insights');
+    closeButton.type = 'button';
+    header.append(heading, closeButton);
+    const actions = el('div', 'insights-actions');
+    const summarizeButton = el('button', 'insights-action-button', 'Summarize Data');
+    summarizeButton.type = 'button';
+    const suggestedButton = el('button', 'insights-action-button insights-suggested-question', payload.insights.suggested_question);
+    suggestedButton.type = 'button';
+    suggestedButton.setAttribute('aria-label', `Ask prepared question: ${payload.insights.suggested_question}`);
+    actions.append(summarizeButton, suggestedButton);
+    const queryLabel = el('label', 'insights-query-label');
+    const textareaId = `${cardId}_query`;
+    queryLabel.htmlFor = textareaId;
+    queryLabel.appendChild(el('span', '', 'Your question about this visualization'));
+    const textarea = document.createElement('textarea');
+    textarea.id = textareaId;
+    textarea.rows = 4;
+    textarea.maxLength = MAX_INSIGHT_QUERY_LENGTH;
+    textarea.placeholder = 'Ask a question about the displayed data, its context, supporting documents, or related entities.';
+    const queryHint = el('p', 'insights-query-hint', `Maximum ${MAX_INSIGHT_QUERY_LENGTH.toLocaleString()} characters. Ctrl+Enter or Cmd+Enter submits.`);
+    const customButton = el('button', 'insights-action-button', 'Write Your Own Query');
+    customButton.type = 'button';
+    const cancelButton = el('button', 'secondary-button insights-cancel', 'Cancel request');
+    cancelButton.type = 'button';
+    cancelButton.hidden = true;
+    const statusRegion = el('p', 'insights-status');
+    statusRegion.setAttribute('role', 'status');
+    statusRegion.setAttribute('aria-live', 'polite');
+    const response = el('div', 'insights-response');
+    response.setAttribute('aria-live', 'polite');
+    card.append(header, actions, queryLabel, textarea, queryHint, customButton, cancelButton, statusRegion, response);
+    slot.append(toggle, card);
+    const state = {
+      payload, activeFilters, captureTarget, slot, toggle, card, heading, closeButton,
+      summarizeButton, suggestedButton, textarea, customButton, cancelButton,
+      statusRegion, response, open: false, status: 'closed', sequence: 0,
+      controller: null, activeSignature: null, health: null,
+    };
+    toggle.addEventListener('click', () => state.open ? closeInsights(state) : openInsights(state));
+    closeButton.addEventListener('click', () => closeInsights(state));
+    cancelButton.addEventListener('click', () => cancelInsightRequest(state));
+    summarizeButton.addEventListener('click', () => submitInsight(state, 'summarize'));
+    suggestedButton.addEventListener('click', () => submitInsight(state, 'suggested_question'));
+    customButton.addEventListener('click', () => submitInsight(state, 'custom_query'));
+    textarea.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        submitInsight(state, 'custom_query');
+      }
+    });
+    setInsightActionsDisabled(state, true);
+    setInsightState(state, 'closed', 'Insights card closed.');
+    return state;
+  }
+
+  function ensureInsightsControl(chartContainer, payload, activeFilters, captureTarget) {
+    let state = insightStates.get(payload.chart_id);
+    if (!state) {
+      state = createInsightsState(payload, activeFilters, captureTarget);
+      insightStates.set(payload.chart_id, state);
+    }
+    state.payload = payload;
+    state.activeFilters = activeFilters;
+    state.captureTarget = captureTarget;
+    if (state.suggestedButton.textContent !== payload.insights.suggested_question) state.suggestedButton.textContent = payload.insights.suggested_question;
+    chartContainer.appendChild(state.slot);
+    return state;
+  }
+
   function renderQuestion(section, payload, activeFilters, applyFilter) {
     const rows = payload.data.filter((row) => rowMatchesFilters(row, activeFilters));
     const chartContainer = section.querySelector('.chart-placeholder');
@@ -505,10 +966,11 @@
     const traceability = section.querySelector('.traceability');
     renderMetrics(metrics, payload.metrics || payload.metric_cards, payload, rows, activeFilters);
     chartContainer.replaceChildren();
-    chartContainer.appendChild(el('h3', 'chart-title', payload.chart_title));
+    const captureTarget = el('div', 'visualization-capture');
+    captureTarget.appendChild(el('h3', 'chart-title', payload.chart_title));
     const sourceLabel = (payload.source_metadata || []).map((source) => `${source.dataset}: ${source.source_file}`).join('; ');
-    chartContainer.appendChild(el('p', 'chart-definition', `Metric: ${payload.metric_definition}`));
-    chartContainer.appendChild(el('p', 'chart-source', `Source: ${sourceLabel || 'Not available'}`));
+    captureTarget.appendChild(el('p', 'chart-definition', `Metric: ${payload.metric_definition}`));
+    captureTarget.appendChild(el('p', 'chart-source', `Source: ${sourceLabel || 'Not available'}`));
     const meta = el('div', 'chart-meta');
     meta.append(
       el('span', '', `Units: ${payload.visualization.format.y || 'as labeled'}`),
@@ -516,15 +978,17 @@
       el('span', '', `Interactive filters: ${JSON.stringify(activeFilters)}`),
       el('span', '', `Completeness: ${asText(payload.quality_summary.financial_completeness?.aggregate_status || payload.quality_summary.overall_status)}`),
     );
-    chartContainer.appendChild(meta);
+    captureTarget.appendChild(meta);
     const warnings = payload.warnings || [];
     if (warnings.length) {
       const warning = el('aside', 'material-warning');
       warning.appendChild(el('strong', '', 'Material limitations'));
       const list = el('ul'); warnings.forEach((message) => list.appendChild(el('li', '', message))); warning.appendChild(list);
-      chartContainer.appendChild(warning);
+      captureTarget.appendChild(warning);
     }
-    chartContainer.appendChild(renderChart(payload, rows, applyFilter));
+    captureTarget.appendChild(renderChart(payload, rows, applyFilter));
+    chartContainer.appendChild(captureTarget);
+    ensureInsightsControl(chartContainer, payload, activeFilters, captureTarget);
     chartContainer.appendChild(makeDataTable(payload, rows, activeFilters));
     renderNarrative(narrative, payload);
     renderTraceability(traceability, payload, activeFilters);
@@ -618,7 +1082,7 @@
       return;
     }
     const manifest = manifestResult[0].value;
-    if (!manifest || manifest.schema_version !== '2.0' || !Array.isArray(manifest.payloads)) {
+    if (!manifest || manifest.schema_version !== '2.1' || !Array.isArray(manifest.payloads)) {
       const error = new Error(`Unsupported or incomplete dashboard manifest schema: ${asText(manifest?.schema_version)}.`);
       if (status) status.textContent = error.message;
       document.querySelectorAll('[data-question-id]').forEach((section) => renderPanelError(section, error));
@@ -645,5 +1109,16 @@
     redraw();
   }
 
-  window.CepeDashboardRenderer = { render, validatePayload };
+  window.CepeDashboardRenderer = {
+    render,
+    validatePayload,
+    __test__: {
+      captureVisualization,
+      createInsightsState,
+      relevantInsightFilters,
+      renderInsightResponse,
+      resetInsightsHealth: () => { insightsHealthPromise = null; },
+      submitInsight,
+    },
+  };
 })();

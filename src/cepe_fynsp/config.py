@@ -57,7 +57,7 @@ class FormexSettings(StrictModel):
 class DashboardSettings(StrictModel):
     """Static dashboard generation and safe-browser limits."""
 
-    schema_version: str = "2.0"
+    schema_version: str = "2.1"
     lineage_sample_limit: int = Field(default=250, ge=0, le=1000)
     table_page_size: int = Field(default=25, ge=5, le=100)
     client_filter_dimensions: tuple[str, ...] = (
@@ -79,11 +79,24 @@ class AskSageSettings(StrictModel):
     api_key_env: str = "ASKSAGE_API_KEY"
     access_token_env: str = "ASKSAGE_ACCESS_TOKEN"
     model_env: str = "ASKSAGE_MODEL"
+    dataset_guidance_env: str = "ASKSAGE_DATASET_GUIDANCE_ID"
+    dataset_dashboard_payload_env: str = "ASKSAGE_DATASET_DASHBOARD_PAYLOAD_ID"
+    dataset_ontology_env: str = "ASKSAGE_DATASET_ONTOLOGY_ID"
     approved_hosts: tuple[str, ...] = ("api.asksage.ai",)
     connect_timeout_seconds: float = Field(default=10.0, gt=0)
     read_timeout_seconds: float = Field(default=60.0, gt=0)
     max_retries: int = Field(default=3, ge=0, le=8)
     backoff_factor: float = Field(default=0.5, ge=0)
+
+
+class InsightsSettings(StrictModel):
+    """Same-origin service limits and optional capability bindings."""
+
+    request_size_limit_bytes: int = Field(default=6_500_000, ge=1024, le=10_000_000)
+    max_concurrent_requests: int = Field(default=2, ge=1, le=16)
+    rate_limit_requests_per_minute: int = Field(default=30, ge=1, le=600)
+    image_capability_env: str = "ASKSAGE_IMAGE_INPUT_SUPPORTED"
+    document_index: Path = Path("data/curated/guidance_chunks/index.jsonl")
 
 
 class ReportSettings(StrictModel):
@@ -113,6 +126,7 @@ class Settings(StrictModel):
     formex: FormexSettings = Field(default_factory=FormexSettings)
     dashboards: DashboardSettings = Field(default_factory=DashboardSettings)
     asksage: AskSageSettings = Field(default_factory=AskSageSettings)
+    insights: InsightsSettings = Field(default_factory=InsightsSettings)
     report: ReportSettings = Field(default_factory=ReportSettings)
     quality: QualityThresholdSettings = Field(default_factory=QualityThresholdSettings)
     project_root: Path = Field(default=Path("."), exclude=True)

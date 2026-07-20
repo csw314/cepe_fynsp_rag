@@ -11,6 +11,7 @@ from docx import Document
 from pydantic import ValidationError
 
 from cepe_fynsp.agents.rag_agent import answer_question, load_validated_rag_corpus
+from cepe_fynsp.dashboards.insight_questions import INSIGHT_QUESTIONS
 from cepe_fynsp.reporting.generator import REPORT_SECTIONS
 from cepe_fynsp.schemas import DashboardManifest, DashboardQuestionPayload, RagRecord
 from scripts.build_synthetic_ci import run_synthetic_build
@@ -106,6 +107,12 @@ def test_complete_synthetic_build(tmp_path: Path) -> None:
             assert all(metric.aggregate_status for metric in payload.metrics)
             assert payload.columns
             assert payload.ontology_references
+            assert payload.insights.enabled
+            assert (
+                payload.insights.suggested_question
+                == INSIGHT_QUESTIONS[manifest.dashboard_id][entry.question_id]
+            )
+            assert payload.insights.context_version == "1.0"
             assert all(record.origin != "ai_generated_narrative" for record in payload.narrative)
             assert all(record.citations for record in payload.narrative)
             payload_lineage.update(_lineage_values(payload.lineage))

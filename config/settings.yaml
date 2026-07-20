@@ -28,7 +28,7 @@ formex:
   allowed_fiscal_years: [2028, 2029, 2030, 2031, 2032]
 
 dashboards:
-  schema_version: "2.0"
+  schema_version: "2.1"
   lineage_sample_limit: 250
   table_page_size: 25
   client_filter_dimensions:
@@ -46,12 +46,22 @@ asksage:
   api_key_env: ASKSAGE_API_KEY
   access_token_env: ASKSAGE_ACCESS_TOKEN
   model_env: ASKSAGE_MODEL
+  dataset_guidance_env: ASKSAGE_DATASET_GUIDANCE_ID
+  dataset_dashboard_payload_env: ASKSAGE_DATASET_DASHBOARD_PAYLOAD_ID
+  dataset_ontology_env: ASKSAGE_DATASET_ONTOLOGY_ID
   approved_hosts:
-    - api.asksage.ai
+    - api.nnsa.asksage.ai
   connect_timeout_seconds: 10
   read_timeout_seconds: 60
   max_retries: 3
   backoff_factor: 0.5
+
+insights:
+  request_size_limit_bytes: 6500000
+  max_concurrent_requests: 2
+  rate_limit_requests_per_minute: 30
+  image_capability_env: ASKSAGE_IMAGE_INPUT_SUPPORTED
+  document_index: data/curated/guidance_chunks/index.jsonl
 
 report:
   title: CEPE Pit Production FYNSP Program Review

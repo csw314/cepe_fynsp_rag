@@ -1,0 +1,37 @@
+schema_version: "1.0"
+# Add a document only after data-owner/security review. Paths must remain below
+# data/raw/docs, and approved_for_asksage must be true before indexing.
+# The discovered files are scaffolded below but deliberately disabled. Replace
+# pending_data_owner_review with the approved classification marking and set
+# approved_for_asksage to true only for documents authorized for model processing.
+documents:
+  - path: "04 - Stockpile Management (NA-12) - authorizer.pptx"
+    title: "Stockpile Management (NA-12) Authorizer"
+    document_type: reference
+    approved_for_asksage: True
+    classification: cui
+  - path: "CEPE Spring Programming Meeting Notes.docx"
+    title: "CEPE Spring Programming Meeting Notes"
+    document_type: reference
+    approved_for_asksage: True
+    classification: cui
+  - path: "FYNSP2028_BATR_Pu Pits_07132026.docx"
+    title: "FYNSP 2028 BATR Pu Pits"
+    document_type: reference
+    approved_for_asksage: True
+    classification: cui
+  - path: "FYNSP28 CEPE Pu Pits Review Kickoff Slides_v2.pptx"
+    title: "FYNSP 2028 CEPE Pu Pits Review Kickoff Slides"
+    document_type: reference
+    approved_for_asksage: True
+    classification: cui
+  - path: "NNSA FY 2028 Programming Instructions V0 (1).docx"
+    title: "NNSA FY 2028 Programming Instructions V0"
+    document_type: guidance
+    approved_for_asksage: True
+    classification: cui
+  - path: "Spring Programming Meeting Agenda with CEPE Attendee List.docx"
+    title: "Spring Programming Meeting Agenda with CEPE Attendee List"
+    document_type: reference
+    approved_for_asksage: True
+    classification: cui

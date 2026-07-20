@@ -128,7 +128,7 @@ def validate_synthetic_outputs(root: Path) -> dict[str, int]:
     if counts["dashboards"] != 5 or counts["payloads"] != 30:
         raise ValueError(f"Incomplete synthetic build: {counts}")
     landing = json.loads((payload_root / "landing_summary.json").read_text(encoding="utf-8"))
-    if landing.get("schema_version") != "2.0" or not landing.get("metrics"):
+    if landing.get("schema_version") != "2.1" or not landing.get("metrics"):
         raise ValueError("Landing summary is missing or invalid.")
     report_manifest = json.loads(
         (root / "data" / "reports" / "html" / "dashboard_05_report_manifest.json").read_text(

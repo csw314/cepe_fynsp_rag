@@ -86,14 +86,15 @@ def validate_browser(project_root: Path) -> list[str]:
                         dom,
                     )
                 )
-                if errors or ready != 6 or tables != 6 or visuals != 6:
+                insights = len(re.findall(r'class="insights-toggle', dom))
+                if errors or ready != 6 or tables != 6 or visuals != 6 or insights != 6:
                     raise ValueError(
                         f"{page} render failed: ready={ready}, visuals={visuals}, "
-                        f"tables={tables}, errors={errors}."
+                        f"tables={tables}, insights={insights}, errors={errors}."
                     )
                 results.append(
                     f"{page}: ready_panels={ready}, visuals={visuals}, tables={tables}, "
-                    f"filters={filters}, errors={errors}"
+                    f"insights={insights}, filters={filters}, errors={errors}"
                 )
     finally:
         server.shutdown()
