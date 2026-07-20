@@ -76,9 +76,10 @@ The synthetic CI build creates all five dashboards and the report in a temporary
 ## AskSage
 
 AskSage is optional and never blocks ETL, dashboards, or reporting. If enabled, use
-`.env.example` as a names-only template and provide values to the server process through the
-organization's approved environment/secret-injection method. The application does not
-automatically load a local `.env` file. Keep all calls behind
+`.env.example` as a names-only template and provide values through the organization's approved
+environment/secret-injection method. Direct Python entry points do not automatically load a
+local `.env` file; the Windows launcher described below explicitly loads only approved runtime
+names. Keep all calls behind
 `src/cepe_fynsp/asksage/client.py`; never put credentials in browser JavaScript or committed
 configuration. Generated RAG records remain evidence-bounded and cite payload, source,
 lineage, and ontology identifiers.
@@ -103,8 +104,17 @@ Secure-insights operation serves only `web/`, generated aggregate JSON below
 repository files, including local environment/configuration files, are not static routes:
 
 ```powershell
-.\.venv\Scripts\python.exe scripts\run_insights_server.py --project-root . --host 127.0.0.1 --port 8000
+.\scripts\start_insights.ps1
 ```
+
+That single command safely parses the local `.env` without executing it, loads only approved
+AskSage/certificate names, enables approved PNG input for the server run, validates all five
+dashboard artifact sets, prints boolean readiness status without values, and starts the
+loopback server. It restores the shell's earlier environment after the server stops. Use
+`.\scripts\start_insights.ps1 -ValidateOnly` for a non-network startup check, or add
+`-Port 8010` when the default port is already occupied. The direct Python server command
+remains available for managed deployments where an approved secret injector has already
+configured the process environment.
 
 Open `http://127.0.0.1:8000/web/`. The default bind is loopback-only. Production use must sit behind the organization's approved authentication, TLS, host validation, reverse proxy, audit, and access-control boundary. Add a proxy hostname only with the repeatable `--allowed-host` argument. The service does not enable cross-origin access.
 
